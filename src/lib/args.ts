@@ -7,6 +7,7 @@ export type CliArgs = {
   update: boolean
   initialUrl?: string
   themeMode?: ThemeMode
+  outputDir?: string
   error?: string
 }
 
@@ -31,6 +32,14 @@ export function parseArgs(args: string[]): CliArgs {
       const value = arg.slice('--theme='.length)
       if (!isThemeMode(value)) return {...result, error: `unknown theme “${value}” — use auto, light, or dark`}
       result.themeMode = value
+    } else if (arg === '-o' || arg === '--output') {
+      const value = args[++index]
+      if (!value || value.startsWith('-')) return {...result, error: `${arg} needs a folder, e.g. ${arg} ~/Videos`}
+      result.outputDir = value
+    } else if (arg.startsWith('--output=')) {
+      const value = arg.slice('--output='.length)
+      if (!value) return {...result, error: '--output needs a folder, e.g. --output=~/Videos'}
+      result.outputDir = value
     } else if (arg.startsWith('-')) {
       return {...result, error: `unknown option “${arg}”`}
     } else {

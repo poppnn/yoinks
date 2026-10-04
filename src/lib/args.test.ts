@@ -61,3 +61,16 @@ test('auto delegates to terminal colors while forced modes own the full surface'
   assert.equal(themeFor('dark').background, '#18181b')
   assert.equal(themeFor('dark').primary, '#ffffff')
 })
+
+test('parses -o, --output and --output= as the output folder', () => {
+  assert.equal(parseArgs(['-o', '~/Videos']).outputDir, '~/Videos')
+  assert.equal(parseArgs(['--output', '/tmp/vids', 'https://example.com/v']).outputDir, '/tmp/vids')
+  assert.equal(parseArgs(['--output=/tmp/vids']).outputDir, '/tmp/vids')
+  assert.equal(parseArgs(['https://example.com/v']).outputDir, undefined)
+})
+
+test('rejects -o without a folder', () => {
+  assert.match(parseArgs(['-o']).error ?? '', /needs a folder/)
+  assert.match(parseArgs(['-o', '--theme', 'dark']).error ?? '', /needs a folder/)
+  assert.match(parseArgs(['--output=']).error ?? '', /needs a folder/)
+})
