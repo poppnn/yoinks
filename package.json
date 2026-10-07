@@ -4,13 +4,14 @@
   "description": "yoink any video from YouTube, X, Instagram, Threads & 1800+ sites — right from your terminal. paste. yoink. done.",
   "type": "module",
   "bin": {
-    "yoinks": "dist/cli.js"
+    "yoinks": "bin/yoinks.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsup",
