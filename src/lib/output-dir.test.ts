@@ -5,7 +5,8 @@ import path from 'node:path'
 import test from 'node:test'
 import {ensureOutputDir, resolveOutputDir} from './output-dir.js'
 
-const home = path.join(path.sep, 'home', 'tester')
+// absolute on every OS — on Windows path.resolve would add a drive letter
+const home = path.resolve(path.sep, 'home', 'tester')
 
 test('defaults to ~/Downloads when no flag is given', () => {
   assert.equal(resolveOutputDir(undefined, home), path.join(home, 'Downloads'))
