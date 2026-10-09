@@ -23,6 +23,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   theme, format.
 - Press `o` when done to open the folder. (from #23, thanks
   @SuperProCoolName)
+- Press `c` when done to copy the file itself, ready to paste into a chat
+  or a folder. (from #2, thanks @EmekC)
+- `--plain` (screen readers: no full screen, mouse or animation),
+  `--no-mouse` and `--no-motion`, also as config settings. (from #31,
+  thanks @juan-multi-7575)
+- `yoinks <url> -- <options>` passes options to yt-dlp; the ones that would
+  break yoinks are refused with what to use instead. Files yt-dlp writes
+  alongside the download, like subtitles, are kept.
 - MP3s get artist and title tags (from "Artist - Title" names) and the
   thumbnail as cover art; videos get their tags and chapters. Needs
   ffmpeg, which yoinks bundles. (#12, #3)
@@ -54,6 +62,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Killing yoinks or closing its terminal no longer leaves the shell in the
+  alternate screen with mouse reports typed into it.
 - The size shown for each resolution is the size of what gets downloaded,
   not just the audio's. (thanks @g9i)
 - **You no longer get an old file instead of the one you picked.** yt-dlp

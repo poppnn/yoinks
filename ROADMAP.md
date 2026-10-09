@@ -123,12 +123,25 @@ Ce que la réalisation a changé par rapport au plan :
 
 ### Phase 4 — Accessibilité et confort · v0.7
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| `--no-mouse`, `--plain` (sans écran alternatif), `--no-motion`, respect de `NO_COLOR` | M | PR #31 (à découper) |
-| Saisie lisible par les lecteurs d'écran (spans contigus) | S | PR #31 |
-| Copier le chemin du fichier dans le presse-papiers | S | PR #2 |
-| Option de secours pour passer des arguments bruts à yt-dlp (`yoinks <url> -- --opt`), avec une liste d'options interdites qui casseraient l'analyse de la progression (`--quiet`, `-o`, `--print`…) | M | R6 |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| `--no-mouse`, `--plain` (sans écran alternatif), `--no-motion`, respect de `NO_COLOR` | M | PR #31 | ✅ aussi en config · `NO_COLOR` déjà respecté |
+| Saisie lisible par les lecteurs d'écran (spans contigus) | S | PR #31 | ❌ abandonné : sans effet (voir plus bas) |
+| Copier le fichier dans le presse-papiers | S | PR #2 | ✅ touche `c`, copie le fichier lui-même |
+| Passer des options brutes à yt-dlp (`yoinks <url> -- --opt`), avec une liste d'options refusées | M | R6 | ✅ |
+| *En plus :* restaurer le terminal sur `SIGINT`/`SIGTERM`/`SIGHUP` | S | PR #31 | ✅ |
+
+Ce que la réalisation a changé par rapport au plan :
+
+- **#31 a été découpée ici plutôt que renvoyée à son auteur**, puisque le projet est repris. Sur ses quatre sujets, une partie a été écartée pour de bonnes raisons :
+  - le dossier courant par défaut aurait annulé #22 ;
+  - `^h` sert de retour arrière dans beaucoup de terminaux ;
+  - le plantage annoncé de la barre de progression n'existe pas : `'█'.repeat(NaN)` renvoie une chaîne vide.
+- **`NO_COLOR` était déjà respecté** : le thème `auto` n'émet aucune couleur. Le lier à l'animation, comme le faisait #31, mélangeait deux sujets.
+- **La « saisie lisible par lecteur d'écran » ne change rien** : un lecteur d'écran lit le texte du terminal, identique qu'Ink produise un nœud par caractère ou un seul.
+- **Vérifié par un vrai rendu** de l'interface dans un faux terminal 80×24 : 22 images en 1,5 s avec l'animation, 2 avec `--no-motion` ; souris seulement en mode normal ; `--plain` fait 13 lignes de haut.
+- **#2 copie le fichier, pas son chemin**, ce qui est plus utile. Sa bascule `^d` et son second fichier de réglages ont été remplacés par une touche à la demande.
+- **Le passage d'options a révélé un bug** : tout fichier annexe (sous-titres, miniature…) était supprimé avec le dossier temporaire. Corrigé et vérifié.
 
 ### Phase 5 — Playlists · v0.8
 
@@ -159,9 +172,9 @@ Chaque PR se fusionne seule sans conflit avec `main`, mais **elles se chevauchen
 | 4 | #35 option `-o` | **Fusionner, puis adapter** | Rebrancher sur la config et le Known Folder (phase 2) |
 | 5 | #7 nom de fichier | **Fusionner après #40** | Touche aussi le chemin de sortie |
 | 6 | #33 QuickTime H.264/AAC | **Non reprise** (phase 3) | Elle ajoutait une ligne « QuickTime » à côté de lignes restées en AV1/Opus. #40 rend le choix par défaut compatible pour tout le monde, et son suffixe `.quicktime.mp4` contournait un bug déjà corrigé. |
-| 7 | #2 copier dans le presse-papiers | **Fusionner** | Petite |
+| 7 | #2 copier dans le presse-papiers | **Reprise en partie** (phase 4) | La copie, pas la bascule `^d` ni le fichier `settings.json` |
 | — | #23 QoL | **Reprendre en partie** | Garder `--concurrent-fragments`, le nettoyage des fichiers temporaires et la touche `o`. **Refuser** `--cookies-from-browser firefox` codé en dur : fatal pour quiconque n'a pas Firefox. |
-| — | #31 accessibilité | **Demander un découpage** | 432 lignes sur 19 fichiers, impossible à relire d'un bloc et en conflit avec tout le reste |
+| — | #31 accessibilité | **Découpée et reprise en partie** (phase 4) | Voir la phase 4 pour ce qui a été écarté et pourquoi |
 | — | #17 repli mweb sur 403 | **En attente** | Fixer un `player_client` vieillit mal ; réévaluer une fois R1 corrigé, car un yt-dlp à jour rend souvent ce contournement inutile |
 | — | #4 chapitres | **Rendue inutile** (phase 3) | Les chapitres arrivent avec `--embed-metadata` |
 | — | #16 multilingue | **Reporter** | Voir plus haut |
