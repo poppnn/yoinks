@@ -108,11 +108,18 @@ Ce que la réalisation a ajouté ou corrigé par rapport au plan :
 
 ### Phase 3 — Formats · v0.6
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| Vidéos compatibles partout : préférer H.264/AAC via le tri natif de yt-dlp (`-S res:<h>,vcodec:h264,acodec:m4a`) plutôt que des filtres écrits à la main. Afficher le codec dans le menu. | M | R5, #32 |
-| MP3 : métadonnées ID3 et pochette (`--embed-metadata --embed-thumbnail`) | S | #12 |
-| Chapitres intégrés (`--embed-chapters`) | S | #3, PR #4 |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| Vidéos compatibles partout : H.264/AAC d'abord, puis AV1/AAC. Afficher le codec dans le menu. | M | R5, #32 | ✅ sélecteur repris de #40, codec affiché hors H.264 |
+| MP3 : métadonnées ID3 et pochette | S | #12 | ✅ |
+| Chapitres intégrés | S | #3, PR #4 | ✅ via `--embed-metadata` |
+
+Ce que la réalisation a changé par rapport au plan :
+
+- **Un sélecteur explicite plutôt que le tri `-S`.** #40 avait déjà écrit et testé un sélecteur clair (H.264 → AV1 → n'importe quoi, AAC d'abord, résolution garantie). La sémantique de `-S vcodec:h264` (« jusqu'à h264 dans l'ordre interne ») est plus difficile à relire. Le choix a été vérifié avec le vrai yt-dlp (`--simulate`) sur une vidéo 4K, ligne par ligne.
+- **Les tags MP3 passent par les champs `meta_`.** La proposition de #12 réécrivait `title` avant le calcul du nom de fichier, ce qui aurait retiré l'artiste du nom.
+- **Les métadonnées ne sont intégrées que si ffmpeg est présent.** Sans lui, yt-dlp fait échouer tout le téléchargement, même quand le fichier est déjà récupéré. Ça a été vérifié.
+- **`--embed-chapters` n'est pas nécessaire** : `--embed-metadata` intègre déjà les chapitres.
 
 ### Phase 4 — Accessibilité et confort · v0.7
 
@@ -147,16 +154,16 @@ Chaque PR se fusionne seule sans conflit avec `main`, mais **elles se chevauchen
 | Ordre | PR | Décision | Raison |
 |---|---|---|---|
 | 1 | #37 garde-fou Node | **Fusionner** | Corrige R3, petite, isolée |
-| 2 | #40 mauvais fichier, blocage, QuickTime | **6 commits sur 8 repris** (phase 1) | La PR contient 8 commits, pas 3. Les 2 derniers (préférence QuickTime, taille réelle par résolution) attendent la phase 3, à comparer avec #33. |
+| 2 | #40 mauvais fichier, blocage, QuickTime | **Reprise en entier** (6 commits en phase 1, 2 en phase 3) | La PR contient 8 commits, pas 3. |
 | 3 | #18 nettoyage à l'annulation | **Rendue inutile** | Le dossier isolé de #40 supprime tous les fichiers partiels et reprend l'attente de fin de yt-dlp que #18 avait identifiée. Créditée dans le CHANGELOG. |
 | 4 | #35 option `-o` | **Fusionner, puis adapter** | Rebrancher sur la config et le Known Folder (phase 2) |
 | 5 | #7 nom de fichier | **Fusionner après #40** | Touche aussi le chemin de sortie |
-| 6 | #33 QuickTime H.264/AAC | **Comparer avec #40** | Les deux résolvent R5 ; n'en garder qu'une, de préférence avec le tri `-S` |
+| 6 | #33 QuickTime H.264/AAC | **Non reprise** (phase 3) | Elle ajoutait une ligne « QuickTime » à côté de lignes restées en AV1/Opus. #40 rend le choix par défaut compatible pour tout le monde, et son suffixe `.quicktime.mp4` contournait un bug déjà corrigé. |
 | 7 | #2 copier dans le presse-papiers | **Fusionner** | Petite |
 | — | #23 QoL | **Reprendre en partie** | Garder `--concurrent-fragments`, le nettoyage des fichiers temporaires et la touche `o`. **Refuser** `--cookies-from-browser firefox` codé en dur : fatal pour quiconque n'a pas Firefox. |
 | — | #31 accessibilité | **Demander un découpage** | 432 lignes sur 19 fichiers, impossible à relire d'un bloc et en conflit avec tout le reste |
 | — | #17 repli mweb sur 403 | **En attente** | Fixer un `player_client` vieillit mal ; réévaluer une fois R1 corrigé, car un yt-dlp à jour rend souvent ce contournement inutile |
-| — | #4 chapitres | **Relire** | Recoupe la phase 3 |
+| — | #4 chapitres | **Rendue inutile** (phase 3) | Les chapitres arrivent avec `--embed-metadata` |
 | — | #16 multilingue | **Reporter** | Voir plus haut |
 | — | #9 scripts d'installation | **En attente** | Dépend de la décision du §5 |
 

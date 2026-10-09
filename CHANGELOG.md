@@ -23,6 +23,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   theme, format.
 - Press `o` when done to open the folder. (from #23, thanks
   @SuperProCoolName)
+- MP3s get artist and title tags (from "Artist - Title" names) and the
+  thumbnail as cover art; videos get their tags and chapters. Needs
+  ffmpeg, which yoinks bundles. (#12, #3)
 - `yoinks --update` updates yoinks' own yt-dlp right away.
 - Continuous integration on Linux, macOS and Windows with Node 22 and 24.
 - `CONTRIBUTING.md`, `ROADMAP.md` and this changelog.
@@ -34,7 +37,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `~/Downloads`. (#22)
 - Fragmented streams (X, Twitch, Vimeo…) download four fragments at a
   time. (from #23)
-
+- **Videos play everywhere.** yt-dlp's own preference gave VP9 or AV1
+  with Opus audio, which QuickTime and many players can't play — sound but
+  no picture. yoinks now asks for H.264 with AAC (YouTube has it up to
+  1080p), then AV1 with AAC. Rows that aren't H.264 name their codec in
+  the picker, e.g. `2160p · mp4 · AV1`. (#32, thanks @g9i)
 - **yoinks now keeps its own yt-dlp up to date.** It used to prefer any
   yt-dlp on your PATH, however old, and never updated the copy it had
   downloaded — the cause of most "format not available" and 403 errors (#8).
@@ -47,6 +54,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The size shown for each resolution is the size of what gets downloaded,
+  not just the audio's. (thanks @g9i)
 - **You no longer get an old file instead of the one you picked.** yt-dlp
   won't overwrite an existing file, so a second download with the same
   name (another resolution, or another video with the same title) handed
