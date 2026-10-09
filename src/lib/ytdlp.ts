@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {formatBytes} from './format.js'
+import {parsePlaylist, type PlaylistInfo} from './playlist.js'
 import {saveAsOutputTemplate} from './save-as.js'
 import {assetName, dueForCheck, installLatest, managedPath, markChecked} from './ytdlp-install.js'
 
@@ -110,11 +111,14 @@ type RawFormat = {
   filesize_approx?: number
 }
 
-export type ProbeResult = {
-  info: VideoInfo
-  /** Raw -J output saved to disk so downloads can skip re-extraction via --load-info-json. */
-  infoJsonPath: string
-}
+export type ProbeResult =
+  | {
+      info: VideoInfo
+      /** Raw -J output saved to disk so downloads can skip re-extraction via --load-info-json. */
+      infoJsonPath: string
+      playlist?: undefined
+    }
+  | {info: VideoInfo; infoJsonPath?: undefined; playlist: PlaylistInfo}
 
 /** `auth` is the cookie arguments, if any — see cookieArgs(); `extra` the user's own, after --. */
 export async function probe(
@@ -125,7 +129,11 @@ export async function probe(
   extra: string[] = [],
 ): Promise<ProbeResult> {
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', ...auth, ...extra, url], {signal})
+    // --no-playlist keeps a video link that also names a playlist (watch?v=…&list=…)
+    // a single video; --flat-playlist lists a real playlist without probing every item
+    const child = spawn(ytdlp, ['-J', '--no-playlist', '--flat-playlist', '--no-warnings', ...auth, ...extra, url], {
+      signal,
+    })
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
@@ -145,6 +153,12 @@ export async function probe(
     info = JSON.parse(stdout) as VideoInfo
   } catch {
     throw new Error('Could not parse video info from yt-dlp.')
+  }
+
+  const playlist = parsePlaylist(info)
+  if (playlist) {
+    if (playlist.entries.length === 0) throw new Error('No videos found at this link.')
+    return {info, playlist}
   }
 
   const infoJsonPath = path.join(os.tmpdir(), `yoinks-info-${process.pid}-${Date.now()}.json`)
@@ -179,6 +193,41 @@ const MAX_VIDEO_CHOICES = 8
 // QuickTime can't play VP9 and only newer Macs play AV1, but yt-dlp picks
 // them over H.264. Ask for H.264 first, then AV1, with AAC audio.
 const WITH_AAC = '+(ba[acodec^=mp4a]/ba)'
+
+/**
+ * Format choices for a playlist: its items' formats aren't known without
+ * probing each one, so offer height caps with the same codec preference.
+ */
+export function playlistChoices(): DownloadChoice[] {
+  const capped = (height: number): DownloadChoice => ({
+    kind: 'video',
+    label: `up to ${height}p · mp4`,
+    args: ['-f', cappedSelector(height), '--merge-output-format', 'mp4'],
+    embed: EMBED_VIDEO,
+  })
+  return [capped(1080), capped(720), capped(360), audioChoice()]
+}
+
+function cappedSelector(height: number): string {
+  const cap = `[height<=${height}]`
+  return [
+    `bv*${cap}[vcodec~='^(avc|h264)']${WITH_AAC}`,
+    `bv*${cap}[vcodec^=av01]${WITH_AAC}`,
+    `bv*${cap}+ba`,
+    `b${cap}`,
+    'bv*+ba',
+    'b',
+  ].join('/')
+}
+
+function audioChoice(): DownloadChoice {
+  return {
+    kind: 'audio',
+    label: 'audio only · mp3',
+    args: ['-f', 'ba/b', '-x', '--audio-format', 'mp3', '--audio-quality', '0'],
+    embed: EMBED_MP3,
+  }
+}
 
 function videoSelector(height: number): string {
   return [
@@ -234,12 +283,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
   }
 
   const audioSizeLabel = audioSize ? ` · ~${formatBytes(audioSize)}` : ''
-  choices.push({
-    kind: 'audio',
-    label: `audio only · mp3${audioSizeLabel}`,
-    args: ['-f', 'ba/b', '-x', '--audio-format', 'mp3', '--audio-quality', '0'],
-    embed: EMBED_MP3,
-  })
+  choices.push({...audioChoice(), label: `audio only · mp3${audioSizeLabel}`})
 
   return choices
 }
@@ -293,6 +337,10 @@ type DownloadOptions = {
   name?: string
   /** the user's own yt-dlp options, from after -- */
   extra?: string[]
+  /** download this 1-based item of the playlist at `url` instead of a single video */
+  playlistItem?: number
+  /** yt-dlp output template for the file name, instead of the title or `name` */
+  template?: string
 }
 
 export async function download(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
@@ -337,7 +385,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     ...opts.choice.args,
     ...(opts.ffmpeg ? (opts.choice.embed ?? []) : []),
     ...(opts.auth ?? []),
-    '--no-playlist',
+    ...(opts.playlistItem ? ['--yes-playlist', '-I', String(opts.playlistItem)] : ['--no-playlist']),
     '--no-warnings',
     // HLS/DASH sites (X, Twitch, Vimeo…) serve hundreds of small fragments:
     // fetching four at a time is several times faster
@@ -354,7 +402,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     'after_move:filepath',
     '--no-simulate',
     '-o',
-    saveAsOutputTemplate(opts.outDir, opts.name),
+    opts.template ? path.join(opts.outDir, opts.template) : saveAsOutputTemplate(opts.outDir, opts.name),
   ]
   // on the PATH, yt-dlp finds it itself
   if (opts.ffmpeg && opts.ffmpeg !== 'ffmpeg') args.push('--ffmpeg-location', opts.ffmpeg)

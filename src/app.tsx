@@ -246,6 +246,11 @@ function AppContent({
         auth => probe(ytdlp, targetUrl, controller.signal, auth, ytdlpArgs),
         cookieArgs(cookies),
       )
+      if (outcome.result.playlist) {
+        // the picker for playlists comes next; until then, point at what works
+        setPhase({name: 'error', message: 'This link is a playlist. Use --best or --mp3 to download it, with --items to pick some.'})
+        return
+      }
       const {info: videoInfo, infoJsonPath} = outcome.result
       if (controller.signal.aborted) {
         void fs.rm(infoJsonPath, {force: true}).catch(() => {})

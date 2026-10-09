@@ -22,6 +22,8 @@ export type CliArgs = {
   pick?: Pick
   /** file name for the download, extension added by the format */
   name?: string
+  /** playlist items to download, e.g. "1-3,7" */
+  items?: string
   /** everything after --, passed to yt-dlp as is */
   ytdlpArgs?: string[]
   /** sign in with these cookies — never on by default */
@@ -73,6 +75,10 @@ export function parseArgs(args: string[]): CliArgs {
       const value = arg.slice('--output='.length)
       if (!value) return {...result, error: '--output needs a folder, e.g. --output=~/Videos'}
       result.outputDir = value
+    } else if (arg === '--items' || arg.startsWith('--items=')) {
+      const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
+      if (!value || !/^[\d,\s-]+$/.test(value)) return {...result, error: '--items needs numbers or ranges, e.g. 1-3,7'}
+      result.items = value
     } else if (arg === '-n' || arg === '--name' || arg.startsWith('--name=')) {
       const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
       if (value === undefined || value.startsWith('-')) return {...result, error: `${arg} needs a file name`}
