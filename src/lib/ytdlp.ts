@@ -191,9 +191,11 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
     // if the video size is unknown, show nothing rather than just the audio size
     const size = videoSize === undefined ? 0 : videoSize + (muxed ? 0 : sizeOf(audio) ?? 0)
     const sizeLabel = size > 0 ? ` · ~${formatBytes(size)}` : ''
+    // H.264 plays everywhere, so only name the codec when it might not
+    const codecLabel = isH264(best) ? '' : ` · ${codecName(best)}`
     choices.push({
       kind: 'video',
-      label: `${height}p · mp4${sizeLabel}`,
+      label: `${height}p · mp4${codecLabel}${sizeLabel}`,
       args: ['-f', videoSelector(height), '--merge-output-format', 'mp4'],
     })
   }
@@ -218,6 +220,14 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
 
 const isH264 = (f: RawFormat) => /^(avc|h264)/.test(f.vcodec ?? '')
 const isAv1 = (f: RawFormat) => f.vcodec?.startsWith('av01') ?? false
+
+function codecName(f: RawFormat): string {
+  const codec = (f.vcodec ?? '').toLowerCase()
+  if (codec.startsWith('av01')) return 'AV1'
+  if (codec.startsWith('vp9') || codec.startsWith('vp09')) return 'VP9'
+  if (codec.startsWith('hev1') || codec.startsWith('hvc1') || codec.startsWith('h265')) return 'HEVC'
+  return codec.split('.')[0]!.toUpperCase() || '?'
+}
 const sizeOf = (f?: RawFormat) => f?.filesize ?? f?.filesize_approx
 const byBitrate = (a: RawFormat, b: RawFormat) => (b.abr ?? b.tbr ?? 0) - (a.abr ?? a.tbr ?? 0)
 
