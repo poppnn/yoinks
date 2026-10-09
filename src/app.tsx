@@ -18,6 +18,7 @@ import {formatBytes, formatDuration, formatEta, formatSpeed, shortenPath, trunca
 import {addToHistory, loadHistory} from './lib/history.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
 import {revealInFileManager} from './lib/reveal.js'
+import {copyFileToClipboard} from './lib/clipboard.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
 import {nextThemeMode, ThemeProvider, type ThemeMode, useTheme} from './theme.js'
 import {
@@ -126,6 +127,7 @@ const HINTS: Record<Phase['name'], Array<[string, string]>> = {
   ],
   done: [
     ['o', 'open folder'],
+    ['c', 'copy file'],
     ['^c', 'quit'],
   ],
   error: [
@@ -270,6 +272,12 @@ function AppContent({
     void revealInFileManager(filepath).then(opened => setRevealFailed(!opened))
   }, [])
 
+  const [copied, setCopied] = useState<boolean>()
+
+  const copyFile = useCallback((filepath: string) => {
+    void copyFileToClipboard(filepath).then(setCopied)
+  }, [])
+
   const resetToInput = useCallback(() => {
     setUrl('')
     setUrlInput('')
@@ -301,6 +309,10 @@ function AppContent({
         openFolder(phase.filepath)
         return
       }
+      if (input === 'c' && !key.ctrl && !key.meta && phase.name === 'done') {
+        copyFile(phase.filepath)
+        return
+      }
       if (key.escape && (phase.name === 'picking' || phase.name === 'error' || phase.name === 'done')) resetToInput()
       if (key.escape && (phase.name === 'probing' || phase.name === 'downloading')) cancelRun()
       if (key.return && phase.name === 'error') backToUrl()
@@ -328,6 +340,7 @@ function AppContent({
     abortRef.current = controller
     setPhase({name: 'downloading', choice, processing: false})
     setRevealFailed(false)
+    setCopied(undefined)
     void (async () => {
       const handlers = {
         onProgress: (progress: DownloadProgress) =>
@@ -373,6 +386,7 @@ function AppContent({
     if (key === '^c') return () => exit()
     if (key === '^t') return cycleTheme
     if (key === 'o' && phase.name === 'done') return () => openFolder(phase.filepath)
+    if (key === 'c' && phase.name === 'done') return () => copyFile(phase.filepath)
     if (key === 'esc') return phase.name === 'probing' || phase.name === 'downloading' ? cancelRun : resetToInput
     if (key === '↵') {
       if (phase.name === 'input') return () => handleUrlSubmit(urlInput)
@@ -566,6 +580,11 @@ function AppContent({
           {revealFailed ? (
             <Text color={theme.gray} dimColor={theme.dimSecondary}>✗ no file manager to open it with</Text>
           ) : null}
+          {copied === undefined ? null : (
+            <Text color={theme.gray} dimColor={theme.dimSecondary}>
+              {copied ? '⧉ file copied — paste it into a chat or a folder' : '✗ no clipboard tool to copy it with'}
+            </Text>
+          )}
           <Gap />
           <Box
             borderStyle="round"
