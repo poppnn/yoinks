@@ -1,20 +1,9 @@
 import {spawn, type ChildProcess} from 'node:child_process'
-import {createWriteStream} from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import {Readable} from 'node:stream'
-import {pipeline} from 'node:stream/promises'
 import {formatBytes} from './format.js'
-
-const YOINKS_DIR = path.join(os.homedir(), '.yoinks', 'bin')
-const RELEASE_BASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
-
-function ytDlpAssetName(): string {
-  if (process.platform === 'win32') return 'yt-dlp.exe'
-  if (process.platform === 'darwin') return 'yt-dlp_macos'
-  return process.arch === 'arm64' ? 'yt-dlp_linux_aarch64' : 'yt-dlp_linux'
-}
+import {assetName, dueForCheck, installLatest, managedPath, markChecked} from './ytdlp-install.js'
 
 // async on purpose: a spawnSync here blocks the event loop, which freezes
 // ink mid-frame — the user hits enter and sees nothing until it returns
@@ -33,31 +22,51 @@ function commandWorks(cmd: string, args: string[], signal?: AbortSignal): Promis
 }
 
 /**
- * Resolve a usable yt-dlp binary: system install first, then a previously
- * downloaded copy, then download the standalone binary from GitHub releases.
+ * Resolve the yt-dlp to run. yoinks keeps its own copy in ~/.yoinks/bin and
+ * looks for a new release at most once a day: an outdated yt-dlp is the most
+ * common reason downloads fail, and system installs are often months old.
+ * YOINKS_YT_DLP picks a specific binary instead. The system yt-dlp is only a
+ * fallback, for when there is no standalone build or no network.
  */
 export async function ensureYtDlp(onStatus: (message: string) => void, signal?: AbortSignal): Promise<string> {
-  if (await commandWorks('yt-dlp', ['--version'], signal)) return 'yt-dlp'
-
-  const local = path.join(YOINKS_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
-  if (await commandWorks(local, ['--version'], signal)) return local
-
-  // a cancelled check also returns false
-  signal?.throwIfAborted()
-  onStatus('first run: fetching yt-dlp…')
-  await fs.mkdir(YOINKS_DIR, {recursive: true})
-
-  const url = `${RELEASE_BASE}/${ytDlpAssetName()}`
-  const response = await fetch(url, {signal})
-  if (!response.ok || !response.body) {
-    throw new Error(`Could not download yt-dlp (${response.status}). Check your connection and try again.`)
+  const override = process.env.YOINKS_YT_DLP
+  if (override) {
+    if (await commandWorks(override, ['--version'], signal)) return override
+    signal?.throwIfAborted()
+    throw new Error(`YOINKS_YT_DLP is set to “${override}”, but it doesn't run.`)
   }
 
-  const tmp = `${local}.download`
-  await pipeline(Readable.fromWeb(response.body as never), createWriteStream(tmp), {signal})
-  await fs.chmod(tmp, 0o755)
-  await fs.rename(tmp, local)
-  return local
+  let installError: unknown
+  const asset = assetName()
+  if (asset) {
+    const managed = managedPath()
+    const have = await fs.access(managed).then(
+      () => true,
+      () => false,
+    )
+    if (!have || (await dueForCheck())) {
+      if (have) onStatus('checking for a yt-dlp update…')
+      try {
+        await installLatest({target: managed, asset, signal, onStatus})
+      } catch (error) {
+        signal?.throwIfAborted()
+        installError = error // an update that fails keeps the copy we have
+      }
+      // count it even if GitHub was unreachable: a network that blocks it
+      // would otherwise stall every launch. `yoinks --update` forces a retry.
+      await markChecked().catch(() => {})
+    }
+    if (await commandWorks(managed, ['--version'], signal)) return managed
+  }
+
+  if (await commandWorks('yt-dlp', ['--version'], signal)) return 'yt-dlp'
+  // a cancelled check also returns false
+  signal?.throwIfAborted()
+  if (installError instanceof Error) {
+    const reason = installError.message === 'fetch failed' ? 'Could not reach GitHub to download yt-dlp.' : installError.message
+    throw new Error(`${reason} Check your connection and try again.`)
+  }
+  throw new Error('No yt-dlp build runs on this system. Install yt-dlp (https://github.com/yt-dlp/yt-dlp#installation) and try again.')
 }
 
 /**

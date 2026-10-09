@@ -56,7 +56,13 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 
 - Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). On first run,
   yoinks downloads the standalone yt-dlp binary to `~/.yoinks/bin` —
-  no Python required. If you already have yt-dlp installed, it uses yours.
+  no Python required — and checks its SHA-256 against the release.
+- Sites change all the time and an outdated yt-dlp is the most common
+  reason a download fails, so yoinks looks for a new yt-dlp release once
+  a day and updates its copy. `yoinks --update` does it right away.
+- To use your own yt-dlp instead, set `YOINKS_YT_DLP` to its name or
+  path. Your system yt-dlp is also used as a fallback when yoinks can't
+  get its own copy, e.g. offline on first run or on Termux.
 - ffmpeg (needed for merging high-res streams and mp3 extraction) is found
   on your PATH, with `ffmpeg-static` as a bundled fallback.
 - The UI is [Ink](https://github.com/vadimdemedes/ink) — React for the

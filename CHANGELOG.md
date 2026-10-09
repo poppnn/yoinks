@@ -8,6 +8,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **yoinks now keeps its own yt-dlp up to date.** It used to prefer any
+  yt-dlp on your PATH, however old, and never updated the copy it had
+  downloaded — the cause of most "format not available" and 403 errors (#8).
+  It now uses its own copy in `~/.yoinks/bin`, checks for a new release at
+  most once a day, and verifies every download against the release's
+  SHA-256 checksums. Set `YOINKS_YT_DLP` to use a different yt-dlp.
 - Node.js 22 or later is now required — `ink@7` never ran on older versions.
   The `yoinks` command now exits with a clear message instead of crashing
   on startup. (#37, thanks @agammann)
@@ -19,6 +25,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `yoinks --update` updates yoinks' own yt-dlp right away.
 - Continuous integration on Linux, macOS and Windows with Node 22 and 24.
 - `CONTRIBUTING.md`, `ROADMAP.md` and this changelog.
 

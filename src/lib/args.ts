@@ -3,13 +3,15 @@ import {isThemeMode, type ThemeMode} from '../theme.js'
 export type CliArgs = {
   help: boolean
   version: boolean
+  /** update yoinks' own yt-dlp and exit */
+  update: boolean
   initialUrl?: string
   themeMode?: ThemeMode
   error?: string
 }
 
 export function parseArgs(args: string[]): CliArgs {
-  const result: CliArgs = {help: false, version: false}
+  const result: CliArgs = {help: false, version: false, update: false}
   const positional: string[] = []
 
   for (let index = 0; index < args.length; index++) {
@@ -18,6 +20,8 @@ export function parseArgs(args: string[]): CliArgs {
       result.help = true
     } else if (arg === '-v' || arg === '--version') {
       result.version = true
+    } else if (arg === '--update') {
+      result.update = true
     } else if (arg === '--theme') {
       const value = args[++index]
       if (!value) return {...result, error: '--theme needs a value: auto, light, or dark'}
