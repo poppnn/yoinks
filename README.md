@@ -77,13 +77,7 @@ To try it as a global command without publishing: `npm link`, then run
 
 ## Roadmap
 
-- [ ] `--best` / `--mp3` flags to skip the picker (scriptable mode)
-- [ ] `-o <dir>` to choose the output folder
-- [ ] Playlist / thread-with-multiple-videos support
-- [ ] Clipboard detection: launch bare and auto-suggest the url you copied
-- [ ] Self-update for the bundled yt-dlp binary (`yt-dlp -U`)
-- [x] Publish to npm (`npm i -g yoinks` / `npx yoinks`)
-- [ ] `curl yoinks.sh | sh` installer
+See [ROADMAP.md](ROADMAP.md).
 
 ## A note on fair use
 
