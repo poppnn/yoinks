@@ -2,6 +2,9 @@ import {isThemeMode, type ThemeMode} from '../theme.js'
 import {checkBrowserSpec, type Cookies} from './cookies.js'
 import {validateSaveAs} from './save-as.js'
 
+/** what to download when skipping the picker */
+export type Pick = 'best' | 'mp3'
+
 export type CliArgs = {
   help: boolean
   version: boolean
@@ -10,6 +13,8 @@ export type CliArgs = {
   initialUrl?: string
   themeMode?: ThemeMode
   outputDir?: string
+  /** skip the picker and download this, without the interface */
+  pick?: Pick
   /** file name for the download, extension added by the format */
   name?: string
   /** sign in with these cookies — never on by default */
@@ -29,6 +34,9 @@ export function parseArgs(args: string[]): CliArgs {
       result.version = true
     } else if (arg === '--update') {
       result.update = true
+    } else if (arg === '--best' || arg === '--mp3') {
+      if (result.pick && result.pick !== arg.slice(2)) return {...result, error: 'use either --best or --mp3'}
+      result.pick = arg === '--best' ? 'best' : 'mp3'
     } else if (arg === '--theme') {
       const value = args[++index]
       if (!value) return {...result, error: '--theme needs a value: auto, light, or dark'}
