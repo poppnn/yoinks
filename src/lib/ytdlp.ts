@@ -124,7 +124,7 @@ export async function probe(ytdlp: string, url: string, signal?: AbortSignal): P
     child.on('error', reject)
     child.on('close', code => {
       if (code !== 0) {
-        reject(new Error(cleanYtDlpError(stderr) || `yt-dlp exited with code ${code}`))
+        reject(new Error(describeYtDlpError(stderr, ytdlp) || `yt-dlp exited with code ${code}`))
       } else {
         resolve(out)
       }
@@ -343,7 +343,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
       if (code === 0 && filepath) {
         resolve(filepath)
       } else {
-        reject(new Error(cleanYtDlpError(stderr) || `Download failed (yt-dlp exit code ${code}).`))
+        reject(new Error(describeYtDlpError(stderr, opts.ytdlp) || `Download failed (yt-dlp exit code ${code}).`))
       }
     })
   })
@@ -355,11 +355,31 @@ function toNumber(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-function cleanYtDlpError(stderr: string): string {
-  const lines = stderr
+const NEEDS_LOGIN = /sign in to confirm|not a bot|login required|members[- ]only|use --cookies/i
+const LOOKS_OUTDATED = /requested format is not available|http error 403|unable to extract|nsig extraction|signature extraction/i
+
+/**
+ * The last error yt-dlp printed, rewritten when we can say something more
+ * useful: yt-dlp's own advice names flags yoinks doesn't have.
+ */
+export function describeYtDlpError(stderr: string, ytdlp: string): string {
+  const last = stderr
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.startsWith('ERROR:'))
-  const last = lines.at(-1)
-  return last ? last.replace(/^ERROR:\s*(\[[^\]]+\]\s*)?/, '') : ''
+    .at(-1)
+  if (!last) return ''
+  const message = last.replace(/^ERROR:\s*(\[[^\]]+\]\s*)?/, '')
+
+  if (NEEDS_LOGIN.test(message)) {
+    return "This video needs a signed-in account (age check, bot check or members-only), and yoinks can't use your login yet. For now, run yt-dlp yourself with --cookies."
+  }
+  if (LOOKS_OUTDATED.test(message)) {
+    // keep yt-dlp's first sentence, drop its "Use --list-formats…" advice
+    const what = message.split(/(?<=\.)\s/)[0]
+    const fix =
+      ytdlp === managedPath() ? 'Run “yoinks --update” and try again.' : `Update ${ytdlp === 'yt-dlp' ? 'your yt-dlp' : ytdlp} and try again.`
+    return `${what} This often means yt-dlp is out of date. ${fix}`
+  }
+  return message
 }
