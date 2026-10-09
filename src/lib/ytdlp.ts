@@ -114,9 +114,10 @@ export type ProbeResult = {
   infoJsonPath: string
 }
 
-export async function probe(ytdlp: string, url: string, signal?: AbortSignal): Promise<ProbeResult> {
+/** `auth` is the cookie arguments, if any — see cookieArgs(). */
+export async function probe(ytdlp: string, url: string, signal?: AbortSignal, auth: string[] = []): Promise<ProbeResult> {
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', url], {signal})
+    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', ...auth, url], {signal})
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
@@ -124,7 +125,7 @@ export async function probe(ytdlp: string, url: string, signal?: AbortSignal): P
     child.on('error', reject)
     child.on('close', code => {
       if (code !== 0) {
-        reject(new Error(describeYtDlpError(stderr, ytdlp) || `yt-dlp exited with code ${code}`))
+        reject(describeYtDlpError(stderr, ytdlp, auth.length > 0) ?? new Error(`yt-dlp exited with code ${code}`))
       } else {
         resolve(out)
       }
@@ -234,6 +235,8 @@ type DownloadOptions = {
   infoJsonPath?: string
   choice: DownloadChoice
   outDir: string
+  /** cookie arguments, the same ones the probe succeeded with */
+  auth?: string[]
 }
 
 export async function download(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
@@ -270,6 +273,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
   const args = [
     ...(opts.infoJsonPath ? ['--load-info-json', opts.infoJsonPath] : [opts.url]),
     ...opts.choice.args,
+    ...(opts.auth ?? []),
     '--no-playlist',
     '--no-warnings',
     '--newline',
@@ -343,7 +347,10 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
       if (code === 0 && filepath) {
         resolve(filepath)
       } else {
-        reject(new Error(describeYtDlpError(stderr, opts.ytdlp) || `Download failed (yt-dlp exit code ${code}).`))
+        reject(
+          describeYtDlpError(stderr, opts.ytdlp, Boolean(opts.auth?.length)) ??
+            new Error(`Download failed (yt-dlp exit code ${code}).`),
+        )
       }
     })
   })
@@ -355,31 +362,89 @@ function toNumber(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
+export type YtDlpErrorKind = 'cookies' | 'login' | 'outdated' | 'other'
+
+export class YtDlpError extends Error {
+  constructor(
+    message: string,
+    readonly kind: YtDlpErrorKind,
+  ) {
+    super(message)
+    this.name = 'YtDlpError'
+  }
+}
+
+const BROWSER_LOCKED = /failed to decrypt|could not copy .*cookie/i
+const BROWSER_MISSING = /could not find .*(?:cookies|profile)/i
+const NOT_NETSCAPE = /netscape format cookies/i
 const NEEDS_LOGIN = /sign in to confirm|not a bot|login required|members[- ]only|use --cookies/i
 const LOOKS_OUTDATED = /requested format is not available|http error 403|unable to extract|nsig extraction|signature extraction/i
 
 /**
  * The last error yt-dlp printed, rewritten when we can say something more
- * useful: yt-dlp's own advice names flags yoinks doesn't have.
+ * useful: yt-dlp's own advice names flags yoinks doesn't have, or doesn't
+ * say what to do. `signedIn` tells whether cookies were passed.
  */
-export function describeYtDlpError(stderr: string, ytdlp: string): string {
+export function describeYtDlpError(stderr: string, ytdlp: string, signedIn = false): YtDlpError | undefined {
   const last = stderr
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.startsWith('ERROR:'))
     .at(-1)
-  if (!last) return ''
+  if (!last) return undefined
   const message = last.replace(/^ERROR:\s*(\[[^\]]+\]\s*)?/, '')
 
+  // cookies we were asked to use but couldn't load — checked first, before
+  // the login wall they would have got us past
+  if (BROWSER_LOCKED.test(message)) {
+    return new YtDlpError(
+      "Couldn't read the browser's cookies — on Windows, Chrome, Edge and other Chromium browsers lock them. Use --cookies with an exported cookies.txt, or sign in with Firefox and use --cookies-from-browser firefox.",
+      'cookies',
+    )
+  }
+  if (BROWSER_MISSING.test(message)) {
+    return new YtDlpError("Couldn't find that browser's cookies. Is it installed, and signed in to the site?", 'cookies')
+  }
+  if (NOT_NETSCAPE.test(message)) {
+    return new YtDlpError("That cookies file isn't a Netscape cookies.txt. Export one with a cookies.txt browser extension.", 'cookies')
+  }
+
   if (NEEDS_LOGIN.test(message)) {
-    return "This video needs a signed-in account (age check, bot check or members-only), and yoinks can't use your login yet. For now, run yt-dlp yourself with --cookies."
+    return new YtDlpError(
+      signedIn
+        ? "This video needs a signed-in account, and your cookies didn't sign you in — they may have expired. Export fresh ones."
+        : 'This video needs a signed-in account (age check, bot check or members-only). Sign in with --cookies <file> or --cookies-from-browser <browser>.',
+      'login',
+    )
   }
   if (LOOKS_OUTDATED.test(message)) {
     // keep yt-dlp's first sentence, drop its "Use --list-formats…" advice
     const what = message.split(/(?<=\.)\s/)[0]
     const fix =
       ytdlp === managedPath() ? 'Run “yoinks --update” and try again.' : `Update ${ytdlp === 'yt-dlp' ? 'your yt-dlp' : ytdlp} and try again.`
-    return `${what} This often means yt-dlp is out of date. ${fix}`
+    return new YtDlpError(`${what} This often means yt-dlp is out of date. ${fix}`, 'outdated')
   }
-  return message
+  return new YtDlpError(message, 'other')
+}
+
+/**
+ * Probe with cookies, but don't let cookies we can't read block a video that
+ * doesn't need them: retry without, and hand back a notice to show instead.
+ * A login wall on the retry means the cookie problem is the real story.
+ */
+export async function probeWithCookies(
+  run: (auth: string[]) => Promise<ProbeResult>,
+  auth: string[],
+): Promise<{result: ProbeResult; auth: string[]; notice?: string}> {
+  try {
+    return {result: await run(auth), auth}
+  } catch (error) {
+    if (auth.length === 0 || !(error instanceof YtDlpError) || error.kind !== 'cookies') throw error
+    try {
+      return {result: await run([]), auth: [], notice: `${error.message} Continued without signing in.`}
+    } catch (retryError) {
+      if (retryError instanceof YtDlpError && retryError.kind === 'login') throw error
+      throw retryError
+    }
+  }
 }

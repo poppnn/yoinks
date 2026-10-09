@@ -1,4 +1,5 @@
 import {isThemeMode, type ThemeMode} from '../theme.js'
+import {checkBrowserSpec, type Cookies} from './cookies.js'
 
 export type CliArgs = {
   help: boolean
@@ -8,6 +9,8 @@ export type CliArgs = {
   initialUrl?: string
   themeMode?: ThemeMode
   outputDir?: string
+  /** sign in with these cookies — never on by default */
+  cookies?: Cookies
   error?: string
 }
 
@@ -40,6 +43,16 @@ export function parseArgs(args: string[]): CliArgs {
       const value = arg.slice('--output='.length)
       if (!value) return {...result, error: '--output needs a folder, e.g. --output=~/Videos'}
       result.outputDir = value
+    } else if (arg === '--cookies-from-browser' || arg.startsWith('--cookies-from-browser=')) {
+      const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
+      if (!value || value.startsWith('-')) return {...result, error: '--cookies-from-browser needs a browser, e.g. firefox'}
+      const problem = checkBrowserSpec(value)
+      if (problem) return {...result, error: problem}
+      result.cookies = {browser: value}
+    } else if (arg === '--cookies' || arg.startsWith('--cookies=')) {
+      const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
+      if (!value || value.startsWith('-')) return {...result, error: '--cookies needs a cookies.txt file'}
+      result.cookies = {file: value}
     } else if (arg.startsWith('-')) {
       return {...result, error: `unknown option “${arg}”`}
     } else {
@@ -47,6 +60,8 @@ export function parseArgs(args: string[]): CliArgs {
     }
   }
 
+  const cookieFlags = args.filter(arg => /^--cookies(-from-browser)?(=|$)/.test(arg)).length
+  if (cookieFlags > 1) return {...result, error: 'use either --cookies or --cookies-from-browser, once'}
   if (positional.length > 1) return {...result, error: 'expected a single url'}
   result.initialUrl = positional[0]
   return result

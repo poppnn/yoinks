@@ -12,6 +12,7 @@ import {ProgressBar} from './components/progress-bar.js'
 import {Shortcuts} from './components/shortcuts.js'
 import {TextInput} from './components/text-input.js'
 import {clickTargetAt, findFrameRow, frameRowSpan, type ClickTarget} from './lib/click-map.js'
+import {cookieArgs, type Cookies} from './lib/cookies.js'
 import {formatBytes, formatDuration, formatEta, formatSpeed, shortenPath, truncate, wrapText} from './lib/format.js'
 import {addToHistory, loadHistory} from './lib/history.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
@@ -23,6 +24,7 @@ import {
   ensureYtDlp,
   findFfmpeg,
   probe,
+  probeWithCookies,
   type DownloadChoice,
   type DownloadProgress,
   type VideoInfo,
@@ -129,6 +131,7 @@ type AppProps = {
   clipboardUrl?: string
   initialThemeMode?: ThemeMode
   outDir: string
+  cookies?: Cookies
   onOutcome: (outcome: Outcome) => void
 }
 
@@ -149,6 +152,7 @@ function AppContent({
   initialUrl,
   clipboardUrl,
   outDir,
+  cookies,
   onOutcome,
   cycleTheme,
 }: {
@@ -156,6 +160,7 @@ function AppContent({
   clipboardUrl?: string
   onOutcome: (outcome: Outcome) => void
   outDir: string
+  cookies?: Cookies
   cycleTheme: () => void
 }) {
   const theme = useTheme()
@@ -170,6 +175,10 @@ function AppContent({
   const ytdlpRef = useRef('')
   const highlightRef = useRef(0) // choice under the cursor, for the ↵ hint click
   const infoJsonRef = useRef<string | undefined>(undefined)
+  // cookie arguments the probe succeeded with — the download reuses them
+  const authRef = useRef<string[]>([])
+  // e.g. cookies we couldn't read, so we carried on without signing in
+  const [notice, setNotice] = useState<string>()
   const abortRef = useRef<AbortController | undefined>(undefined)
   const [phase, setPhase] = useState<Phase>(initialUrl ? {name: 'probing', status: 'warming up…'} : {name: 'input'})
 
@@ -206,11 +215,17 @@ function AppContent({
       ytdlpRef.current = ytdlp
       if (controller.signal.aborted) return
       setPhase({name: 'probing', status: 'fetching video info…'})
-      const {info: videoInfo, infoJsonPath} = await probe(ytdlp, targetUrl, controller.signal)
+      const outcome = await probeWithCookies(
+        auth => probe(ytdlp, targetUrl, controller.signal, auth),
+        cookieArgs(cookies),
+      )
+      const {info: videoInfo, infoJsonPath} = outcome.result
       if (controller.signal.aborted) {
         void fs.rm(infoJsonPath, {force: true}).catch(() => {})
         return
       }
+      authRef.current = outcome.auth
+      setNotice(outcome.notice)
       setInfoJson(infoJsonPath)
       setInfo(videoInfo)
       setChoices(buildChoices(videoInfo))
@@ -220,7 +235,7 @@ function AppContent({
       if (controller.signal.aborted) return
       setPhase({name: 'error', message: error instanceof Error ? error.message : String(error)})
     }
-  }, [setInfoJson])
+  }, [setInfoJson, cookies])
 
   useEffect(() => {
     if (initialUrl) void startProbe(initialUrl)
@@ -288,7 +303,7 @@ function AppContent({
       }
       try {
         const ffmpegLocation = await findFfmpeg()
-        const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir: outDir}
+        const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir, auth: authRef.current}
         let filepath: string
         try {
           // reuse the probe's metadata — starts immediately instead of re-extracting
@@ -424,6 +439,16 @@ function AppContent({
               {info?.duration ? ` · ${formatDuration(info.duration)}` : ''}
               {info?.uploader ? ` · ${info.uploader}` : ''}
             </Text>
+            {notice && (
+              <>
+                <Gap />
+                {wrapText(`⚠ ${notice}`, Math.max(10, contentWidth - 41)).map((line, index) => (
+                  <Text key={index} color={theme.gray} dimColor={theme.dimSecondary}>
+                    {line}
+                  </Text>
+                ))}
+              </>
+            )}
           </Box>
           <Panel title="Download" width={38}>
             <SelectInput
