@@ -330,8 +330,8 @@ function AppContent({
           setPhase(prev => (prev.name === 'downloading' ? {...prev, processing: true} : prev)),
       }
       try {
-        const ffmpegLocation = await findFfmpeg()
-        const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir, auth: authRef.current, name: nameRef.current}
+        const ffmpeg = await findFfmpeg()
+        const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current}
         let filepath: string
         try {
           // reuse the probe's metadata — starts immediately instead of re-extracting

@@ -227,3 +227,43 @@ test('names the codec only on rows that may not play everywhere', () => {
   const vp9Only: VideoInfo = {title: 'x', formats: [{format_id: '1', vcodec: 'vp09.00.40.08', acodec: 'none', height: 1440}]}
   assert.match(buildChoices(vp9Only)[0]!.label, /^1440p · mp4 · VP9$/)
 })
+
+test('mp3s get tags and cover art, videos get tags and chapters', () => {
+  const choices = buildChoices(youtubeLike)
+  const audio = choices.find(c => c.kind === 'audio')!
+  assert.ok(audio.embed?.includes('--embed-thumbnail'))
+  // the tags come from meta_ fields, so the file keeps its "Artist - Title" name
+  assert.ok(audio.embed?.some(arg => arg.includes('(?P<meta_artist>')))
+  assert.ok(!audio.embed?.some(arg => arg.includes('(?P<title>')))
+  for (const video of choices.filter(c => c.kind === 'video')) assert.deepEqual(video.embed, ['--embed-metadata'])
+})
+
+test('embedding is only asked for when ffmpeg is there', {skip: process.platform === 'win32'}, async () => {
+  const dir = await tempDir()
+  const outDir = path.join(dir, 'Downloads')
+  const argsFile = path.join(dir, 'args.json')
+  const ytdlp = await fakeYtDlp(
+    dir,
+    `fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args)); fs.writeFileSync(out, 'x'); console.log(out)`,
+  )
+  const withEmbed = {...choice, embed: ['--embed-metadata']}
+  const ran = async (ffmpeg?: string) => {
+    await download({ytdlp, ffmpeg, url: 'https://example.com/clip.mp4', choice: withEmbed, outDir}, noop)
+    return JSON.parse(await fs.readFile(argsFile, 'utf8')) as string[]
+  }
+
+  const missing = await ran(undefined)
+  assert.ok(!missing.includes('--embed-metadata'))
+  assert.ok(!missing.includes('--ffmpeg-location'))
+
+  const onPath = await ran('ffmpeg')
+  assert.ok(onPath.includes('--embed-metadata'))
+  assert.ok(!onPath.includes('--ffmpeg-location')) // yt-dlp finds it on the PATH itself
+
+  const bundled = await ran('/opt/ffmpeg-static/ffmpeg')
+  assert.deepEqual(bundled.slice(bundled.indexOf('--ffmpeg-location'), bundled.indexOf('--ffmpeg-location') + 2), [
+    '--ffmpeg-location',
+    '/opt/ffmpeg-static/ffmpeg',
+  ])
+  await fs.rm(dir, {recursive: true, force: true})
+})

@@ -71,12 +71,13 @@ export async function ensureYtDlp(onStatus: (message: string) => void, signal?: 
 }
 
 /**
- * Find ffmpeg for stream merging / mp3 extraction: system install first,
- * ffmpeg-static as fallback. Returns undefined if neither exists — yt-dlp
- * still works for single-file formats without it.
+ * Find ffmpeg for stream merging, mp3 extraction and embedding metadata:
+ * system install first ("ffmpeg"), ffmpeg-static as fallback (its path).
+ * Returns undefined if neither exists — yt-dlp still downloads single-file
+ * formats without it.
  */
 export async function findFfmpeg(): Promise<string | undefined> {
-  if (await commandWorks('ffmpeg', ['-version'])) return undefined // on PATH, yt-dlp finds it itself
+  if (await commandWorks('ffmpeg', ['-version'])) return 'ffmpeg'
   try {
     const mod = await import('ffmpeg-static')
     const ffmpegPath = (mod.default ?? mod) as unknown as string | null
@@ -149,7 +150,23 @@ export type DownloadChoice = {
   label: string
   kind: 'video' | 'audio'
   args: string[]
+  /**
+   * Tags, cover art, chapters. Only passed when ffmpeg is available: without
+   * it yt-dlp fails the whole download, even though the file was fetched.
+   */
+  embed?: string[]
 }
+
+/** title, uploader and chapters, which --embed-metadata also covers */
+const EMBED_VIDEO = ['--embed-metadata']
+const EMBED_MP3 = [
+  // "Artist - Title" fills the artist and title tags. meta_ fields only
+  // change the tags: parsing into title itself would also rename the file.
+  '--parse-metadata',
+  'title:(?P<meta_artist>.+?) - (?P<meta_title>.+)',
+  '--embed-metadata',
+  '--embed-thumbnail',
+]
 
 const MAX_VIDEO_CHOICES = 8
 
@@ -197,6 +214,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
       kind: 'video',
       label: `${height}p · mp4${codecLabel}${sizeLabel}`,
       args: ['-f', videoSelector(height), '--merge-output-format', 'mp4'],
+      embed: EMBED_VIDEO,
     })
   }
 
@@ -205,6 +223,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
       kind: 'video',
       label: 'best available · mp4',
       args: ['-f', 'bv*+ba/b', '--merge-output-format', 'mp4'],
+      embed: EMBED_VIDEO,
     })
   }
 
@@ -213,6 +232,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
     kind: 'audio',
     label: `audio only · mp3${audioSizeLabel}`,
     args: ['-f', 'ba/b', '-x', '--audio-format', 'mp3', '--audio-quality', '0'],
+    embed: EMBED_MP3,
   })
 
   return choices
@@ -254,7 +274,8 @@ process.on('exit', () => activeChild?.kill('SIGTERM'))
 
 type DownloadOptions = {
   ytdlp: string
-  ffmpegLocation?: string
+  /** "ffmpeg" when it is on the PATH, its path otherwise, undefined when missing */
+  ffmpeg?: string
   url: string
   /** When set, reuse the probe's metadata instead of re-extracting — starts much faster. */
   infoJsonPath?: string
@@ -300,6 +321,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
   const args = [
     ...(opts.infoJsonPath ? ['--load-info-json', opts.infoJsonPath] : [opts.url]),
     ...opts.choice.args,
+    ...(opts.ffmpeg ? (opts.choice.embed ?? []) : []),
     ...(opts.auth ?? []),
     '--no-playlist',
     '--no-warnings',
@@ -320,7 +342,8 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     '-o',
     saveAsOutputTemplate(opts.outDir, opts.name),
   ]
-  if (opts.ffmpegLocation) args.push('--ffmpeg-location', opts.ffmpegLocation)
+  // on the PATH, yt-dlp finds it itself
+  if (opts.ffmpeg && opts.ffmpeg !== 'ffmpeg') args.push('--ffmpeg-location', opts.ffmpeg)
 
   return new Promise((resolve, reject) => {
     const child = spawn(opts.ytdlp, args, {signal})

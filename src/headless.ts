@@ -59,7 +59,7 @@ export async function runHeadless(opts: {
       onProgress: (progress: DownloadProgress) => status(progressLine(choice.label, progress)),
       onProcessing: () => status(opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'),
     }
-    const base = {ytdlp, ffmpegLocation: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name}
+    const base = {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name}
     let filepath: string
     try {
       filepath = await download({...base, infoJsonPath}, handlers, controller.signal)
