@@ -1,4 +1,5 @@
 import React from 'react'
+import fs from 'node:fs'
 import {createRequire} from 'node:module'
 import {render} from 'ink'
 import {App, type Outcome} from './app.js'
@@ -6,7 +7,8 @@ import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
 import {readClipboard} from './lib/clipboard.js'
 import {isProbablyUrl} from './lib/platforms.js'
-import {ensureOutputDir, resolveOutputDir} from './lib/output-dir.js'
+import {ensureOutputDir, resolveOutputDir, resolveUserPath} from './lib/output-dir.js'
+import type {Cookies} from './lib/cookies.js'
 import {MANAGED_DIR, assetName, installLatest, managedPath, markChecked} from './lib/ytdlp-install.js'
 
 // read at runtime from the shipped package.json so npm version bumps
@@ -22,11 +24,17 @@ const HELP = `
   Examples
     $ yoinks https://youtu.be/dQw4w9WgXcQ
     $ yoinks -o ~/Videos https://youtu.be/dQw4w9WgXcQ
+    $ yoinks --cookies ~/cookies.txt https://youtu.be/<age-restricted>
     $ yoinks https://x.com/user/status/123456
     $ yoinks                 (prompts for a url)
 
   Options
     -o, --output <dir>  save downloads to <dir>
+    --cookies <file>    sign in with a cookies.txt (Netscape format)
+    --cookies-from-browser <browser>
+                        sign in with a browser's cookies: firefox, chrome,
+                        edge, safari, brave… (Chromium browsers often
+                        can't be read on Windows — use --cookies there)
     --theme <mode>      use auto, light, or dark for this run
     --update            update yoinks' own copy of yt-dlp now
     -h, --help          show this help
@@ -72,6 +80,17 @@ if (args.update) {
     console.error(`yoinks: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
   }
+}
+
+// a cookies file that isn't there is a typo: say so now, not after a slow probe
+let cookies: Cookies | undefined = args.cookies
+if (cookies && 'file' in cookies) {
+  const file = resolveUserPath(cookies.file)
+  if (!fs.statSync(file, {throwIfNoEntry: false})?.isFile()) {
+    console.error(`yoinks: no cookies file at “${file}”`)
+    process.exit(1)
+  }
+  cookies = {file}
 }
 
 const outDir = resolveOutputDir(args.outputDir)
@@ -130,6 +149,7 @@ const {waitUntilExit} = render(
     clipboardUrl={clipboardUrl}
     initialThemeMode={initialThemeMode}
     outDir={outDir}
+    cookies={cookies}
     onOutcome={result => (outcome = result)}
   />,
   // keep a copy of every frame so clicks can be hit-tested against it

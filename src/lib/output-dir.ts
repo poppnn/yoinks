@@ -88,14 +88,16 @@ function readDownloadsFromRegistry(): string | undefined {
   }
 }
 
-/** Absolute folder to save into: the -o value with ~ expanded, or the Downloads folder. */
-export function resolveOutputDir(flag?: string, homedir = os.homedir(), defaultDir = () => downloadsDir({homedir})): string {
-  if (flag === undefined) return defaultDir()
+/** A path typed by the user, absolute, with a leading ~ expanded. */
+export function resolveUserPath(input: string, homedir = os.homedir()): string {
   const expanded =
-    flag === '~' || flag.startsWith('~/') || flag.startsWith(`~${path.sep}`)
-      ? path.join(homedir, flag.slice(1))
-      : flag
+    input === '~' || input.startsWith('~/') || input.startsWith(`~${path.sep}`) ? path.join(homedir, input.slice(1)) : input
   return path.resolve(expanded)
+}
+
+/** Absolute folder to save into: the -o value, or the Downloads folder. */
+export function resolveOutputDir(flag?: string, homedir = os.homedir(), defaultDir = () => downloadsDir({homedir})): string {
+  return flag === undefined ? defaultDir() : resolveUserPath(flag, homedir)
 }
 
 /** Creates the folder if needed and checks we can write to it. */

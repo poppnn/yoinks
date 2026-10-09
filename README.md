@@ -54,6 +54,38 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 
 <img src="assets/download-options.png" alt="yoinks format picker — resolutions with estimated file sizes, plus audio-only mp3" width="100%">
 
+## Signing in
+
+Some videos need an account: age-restricted ones, members-only ones, many
+Instagram posts. yoinks never signs in on its own — pass your login as
+cookies, for that run:
+
+```sh
+yoinks --cookies ~/cookies.txt <url>           # a cookies.txt you exported
+yoinks --cookies-from-browser firefox <url>    # read them from a browser
+```
+
+If yoinks can't read the cookies, it carries on without them and tells you
+why, so public videos still download.
+
+**On Windows, prefer `--cookies`.** Chrome, Edge and other Chromium
+browsers lock their cookies away from other apps, so
+`--cookies-from-browser chrome` usually fails there. Firefox works.
+
+**Exporting a cookies.txt that lasts.** YouTube rotates its session
+cookies, so cookies exported from your everyday browser window stop working
+within hours. Instead:
+
+1. Open a private window and sign in to YouTube there.
+2. Open a new tab and close the one you signed in with.
+3. Export the cookies with a cookies.txt extension — prefer an open-source
+   one that works offline: an extension that can read cookies can read
+   all your sessions.
+4. Close the private window. **Don't sign out**: that would invalidate the
+   cookies you just exported.
+
+A cookies.txt is as good as your password: don't share it or commit it.
+
 ## How it works
 
 - Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). On first run,

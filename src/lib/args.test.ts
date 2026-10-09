@@ -28,6 +28,20 @@ test('parses --update on its own', () => {
   assert.equal(parseArgs([]).update, false)
 })
 
+test('parses cookie options, and only one of them', () => {
+  assert.deepEqual(parseArgs(['--cookies', '~/c.txt', 'https://x.com/v']).cookies, {file: '~/c.txt'})
+  assert.deepEqual(parseArgs(['--cookies=c.txt']).cookies, {file: 'c.txt'})
+  assert.deepEqual(parseArgs(['--cookies-from-browser', 'firefox']).cookies, {browser: 'firefox'})
+  // the full yt-dlp spec goes through untouched
+  assert.deepEqual(parseArgs(['--cookies-from-browser=Chrome+gnomekeyring:Profile 1']).cookies, {browser: 'Chrome+gnomekeyring:Profile 1'})
+  assert.equal(parseArgs(['https://x.com/v']).cookies, undefined)
+
+  assert.match(parseArgs(['--cookies']).error ?? '', /needs a cookies\.txt file/)
+  assert.match(parseArgs(['--cookies-from-browser', '--theme']).error ?? '', /needs a browser/)
+  assert.match(parseArgs(['--cookies-from-browser', 'netscape']).error ?? '', /unknown browser “netscape”/)
+  assert.match(parseArgs(['--cookies', 'a.txt', '--cookies-from-browser', 'firefox']).error ?? '', /either --cookies or --cookies-from-browser/)
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)
