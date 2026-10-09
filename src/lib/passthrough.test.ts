@@ -27,5 +27,6 @@ test('refuses options that would break progress, the output path or the picker',
   assert.match(refused('--print', 'title'), /“--print”/)
   assert.match(refused('--skip-download'), /needs the download to happen/)
   assert.match(refused('-U'), /yoinks --update/)
-  assert.match(refused('--yes-playlist'), /playlists/)
+  assert.match(refused('--yes-playlist'), /use --items/)
+  assert.match(refused('-I', '1:3'), /use --items/)
 })
