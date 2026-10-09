@@ -6,6 +6,7 @@ import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
 import {readClipboard} from './lib/clipboard.js'
 import {isProbablyUrl} from './lib/platforms.js'
+import {MANAGED_DIR, assetName, installLatest, managedPath, markChecked} from './lib/ytdlp-install.js'
 
 // read at runtime from the shipped package.json so npm version bumps
 // can't drift from a hardcoded constant
@@ -24,10 +25,13 @@ const HELP = `
 
   Options
     --theme <mode>  use auto, light, or dark for this run
+    --update        update yoinks' own copy of yt-dlp now
     -h, --help      show this help
     -v, --version   show version
 
   Downloads are saved to ~/Downloads.
+  yoinks keeps its own yt-dlp up to date (checked once a day). Set
+  YOINKS_YT_DLP to a binary name or path to use a different one.
   Powered by yt-dlp — YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
 `
 
@@ -46,6 +50,24 @@ if (args.help) {
 if (args.version) {
   console.log(VERSION)
   process.exit(0)
+}
+
+if (args.update) {
+  const asset = assetName()
+  if (!asset) {
+    console.error('yoinks: there is no standalone yt-dlp for this system — update your own yt-dlp instead.')
+    process.exit(1)
+  }
+  try {
+    const {status, tag} = await installLatest({target: managedPath(), asset, onStatus: message => console.log(message)})
+    await markChecked(MANAGED_DIR)
+    console.log(status === 'up-to-date' ? `yt-dlp ${tag} is already the latest.` : `✓ yt-dlp ${tag} ${status}.`)
+    if (process.env.YOINKS_YT_DLP) console.log(`note: YOINKS_YT_DLP is set, so yoinks runs “${process.env.YOINKS_YT_DLP}” instead.`)
+    process.exit(0)
+  } catch (error) {
+    console.error(`yoinks: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
 }
 
 const initialUrl = args.initialUrl

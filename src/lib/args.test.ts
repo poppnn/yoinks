@@ -7,6 +7,7 @@ test('parses a url and a spaced theme option without confusing the value for the
   assert.deepEqual(parseArgs(['--theme', 'light', 'https://example.com/video']), {
     help: false,
     version: false,
+    update: false,
     themeMode: 'light',
     initialUrl: 'https://example.com/video',
   })
@@ -16,9 +17,15 @@ test('parses an equals-style theme option after the url', () => {
   assert.deepEqual(parseArgs(['https://example.com/video', '--theme=dark']), {
     help: false,
     version: false,
+    update: false,
     themeMode: 'dark',
     initialUrl: 'https://example.com/video',
   })
+})
+
+test('parses --update on its own', () => {
+  assert.equal(parseArgs(['--update']).update, true)
+  assert.equal(parseArgs([]).update, false)
 })
 
 test('rejects missing, invalid, and unknown options', () => {
