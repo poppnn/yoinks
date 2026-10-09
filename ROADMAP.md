@@ -65,16 +65,22 @@ Effort estimé : **S** = moins d'une demi-journée · **M** = 1 à 2 jours · **
 
 L'objectif est de faire disparaître les échecs en premier : c'est ce que vivent la plupart des utilisateurs.
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| **Cycle de vie de yt-dlp** : utiliser par défaut la copie gérée par yoinks et la mettre à jour (`yt-dlp -U`) au plus une fois par jour, en arrière-plan. Si un yt-dlp système est utilisé et qu'il date de plus de 30 jours, afficher un avertissement. Ajouter une commande `yoinks --update`. | M | R1, #8 |
-| Vérifier le SHA-256 du binaire contre `SHA2-256SUMS` avant de l'exécuter | S | R2 |
-| Un dossier de téléchargement isolé par tâche, pour ne jamais livrer un ancien fichier | S | R4, PR #40 (commit 1) |
-| Blocage à la fermeture | S | PR #40 |
-| Suppression des fichiers partiels à l'annulation | S | PR #18 |
-| Supprimer le `yoinks-info-*.json` après usage, et à la sortie | S | R9 |
-| Ctrl+V : lire le presse-papiers et insérer son contenu | S | R8, #29 |
-| Messages d'erreur exploitables : pour « Sign in to confirm your age » ou « login required », expliquer l'option cookies au lieu d'afficher l'erreur brute de yt-dlp | S | — |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| **Cycle de vie de yt-dlp** : la copie gérée par yoinks passe en premier, vérifiée au plus une fois par jour. `YOINKS_YT_DLP` permet d'imposer un autre binaire, et le yt-dlp système sert de repli. Commande `yoinks --update`. | M | R1, #8 | ✅ |
+| Vérifier le SHA-256 du binaire contre `SHA2-256SUMS` avant de l'exécuter | S | R2 | ✅ |
+| Un dossier de téléchargement isolé par tâche, pour ne jamais livrer un ancien fichier | S | R4, PR #40 | ✅ repris de #40 |
+| Blocage à la fermeture | S | PR #40 | ✅ repris de #40 |
+| Suppression des fichiers partiels à l'annulation | S | PR #18 | ✅ couvert par le dossier isolé de #40 |
+| Supprimer le `yoinks-info-*.json` après usage, et à la sortie | S | R9 | ✅ repris de #40 |
+| Ctrl+V : lire le presse-papiers et insérer son contenu | S | R8, #29 | ✅ |
+| Messages d'erreur exploitables : compte requis, yt-dlp probablement périmé | S | — | ✅ |
+| *En plus, repris de #40 :* invite du shell qui écrasait « yoinked → », lien conservé après « réessayer », champ trop large sous 72 colonnes | S | PR #40 | ✅ |
+
+Deux écarts avec le plan initial, appris en le réalisant :
+
+- **Pas d'avertissement basé sur l'âge de yt-dlp.** Un yt-dlp de 50 jours peut très bien être la dernière version : il n'y a parfois aucune release pendant des semaines. On compare donc le hash avec la dernière release, sans regarder la date.
+- **Une vérification ratée compte comme faite.** Sinon, un réseau qui bloque GitHub sans répondre ferait attendre 10 secondes à chaque lancement.
 
 ### Phase 2 — Contrôle utilisateur · v0.5
 
@@ -135,8 +141,8 @@ Chaque PR se fusionne seule sans conflit avec `main`, mais **elles se chevauchen
 | Ordre | PR | Décision | Raison |
 |---|---|---|---|
 | 1 | #37 garde-fou Node | **Fusionner** | Corrige R3, petite, isolée |
-| 2 | #40 mauvais fichier, blocage, QuickTime | **Fusionner commit par commit** | Corrige R4 ; l'auteur a isolé chaque correctif. Choisir entre sa partie QuickTime et #33. |
-| 3 | #18 nettoyage à l'annulation | **Fusionner** | Petite et ciblée |
+| 2 | #40 mauvais fichier, blocage, QuickTime | **6 commits sur 8 repris** (phase 1) | La PR contient 8 commits, pas 3. Les 2 derniers (préférence QuickTime, taille réelle par résolution) attendent la phase 3, à comparer avec #33. |
+| 3 | #18 nettoyage à l'annulation | **Rendue inutile** | Le dossier isolé de #40 supprime tous les fichiers partiels et reprend l'attente de fin de yt-dlp que #18 avait identifiée. Créditée dans le CHANGELOG. |
 | 4 | #35 option `-o` | **Fusionner, puis adapter** | Rebrancher sur la config et le Known Folder (phase 2) |
 | 5 | #7 nom de fichier | **Fusionner après #40** | Touche aussi le chemin de sortie |
 | 6 | #33 QuickTime H.264/AAC | **Comparer avec #40** | Les deux résolvent R5 ; n'en garder qu'une, de préférence avec le tri `-S` |

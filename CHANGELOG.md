@@ -20,6 +20,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **You no longer get an old file instead of the one you picked.** yt-dlp
+  won't overwrite an existing file, so a second download with the same
+  name (another resolution, or another video with the same title) handed
+  back the earlier file. Downloads now get a free name such as
+  `clip (1).mp4`. Cancelled downloads leave no partial files behind.
+  (thanks @g9i; the partial-file cleanup also covers #18, thanks @Mr-Neutr0n)
+- Quitting during a download stops it instead of hanging the terminal
+  until it finishes. (thanks @g9i)
+- The shell prompt no longer prints over the "✓ yoinked →" line. (thanks @g9i)
+- Temporary video-info files are deleted instead of piling up in the temp
+  folder, several MB each for long videos. (thanks @g9i)
+- "Try again" after an error keeps the link. (thanks @g9i)
+- The url field and its button fit terminals narrower than 72 columns.
+  (thanks @g9i)
+- ^v pastes into the url field in terminals that send it as a key instead
+  of pasting, such as most Linux terminals and the legacy Windows console.
+  (#29)
+- Errors are explained in plain words when a video needs a signed-in
+  account, or when yt-dlp is likely out of date, instead of yt-dlp advice
+  about flags yoinks doesn't have.
 - Centering no longer collapses spacer rows when the leftover space is odd.
 - The dim auto-theme button no longer splits into bands.
 
