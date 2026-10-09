@@ -1,5 +1,6 @@
 import React from 'react'
 import fs from 'node:fs'
+import os from 'node:os'
 import {createRequire} from 'node:module'
 import {render} from 'ink'
 import {App, type Outcome} from './app.js'
@@ -9,6 +10,7 @@ import {readClipboard} from './lib/clipboard.js'
 import {isProbablyUrl} from './lib/platforms.js'
 import {ensureOutputDir, resolveOutputDir, resolveUserPath} from './lib/output-dir.js'
 import type {Cookies} from './lib/cookies.js'
+import {CONFIG_FILE, loadConfig, type Config} from './lib/config.js'
 import {MANAGED_DIR, assetName, installLatest, managedPath, markChecked} from './lib/ytdlp-install.js'
 import {runHeadless} from './headless.js'
 
@@ -49,6 +51,8 @@ const HELP = `
   unless you pass -o.
   yoinks keeps its own yt-dlp up to date (checked once a day). Set
   YOINKS_YT_DLP to a binary name or path to use a different one.
+  Defaults for -o, cookies, theme and format go in
+  ${CONFIG_FILE.replace(os.homedir(), '~')} — see the README.
   Powered by yt-dlp — YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
 `
 
@@ -87,8 +91,18 @@ if (args.update) {
   }
 }
 
+// loaded after --help, --version and --update, so a broken config file
+// can't get in the way of those
+let config: Config
+try {
+  config = loadConfig()
+} catch (error) {
+  console.error(`yoinks: ${error instanceof Error ? error.message : String(error)}`)
+  process.exit(1)
+}
+
 // a cookies file that isn't there is a typo: say so now, not after a slow probe
-let cookies: Cookies | undefined = args.cookies
+let cookies: Cookies | undefined = args.cookies ?? config.cookies
 if (cookies && 'file' in cookies) {
   const file = resolveUserPath(cookies.file)
   if (!fs.statSync(file, {throwIfNoEntry: false})?.isFile()) {
@@ -98,7 +112,7 @@ if (cookies && 'file' in cookies) {
   cookies = {file}
 }
 
-const outDir = resolveOutputDir(args.outputDir)
+const outDir = resolveOutputDir(args.outputDir ?? config.output)
 
 try {
   ensureOutputDir(outDir)
@@ -114,12 +128,13 @@ if (args.pick || !process.stdout.isTTY) {
     console.error(`yoinks: ${args.pick ? `--${args.pick} needs a url` : 'no url given, and no terminal to ask for one'}`)
     process.exit(1)
   }
-  const code = await runHeadless({url: args.initialUrl, pick: args.pick ?? 'best', outDir, cookies, name: args.name})
+  const pick = args.pick ?? config.format ?? 'best'
+  const code = await runHeadless({url: args.initialUrl, pick, outDir, cookies, name: args.name})
   process.exit(code)
 }
 
 const initialUrl = args.initialUrl
-const initialThemeMode = args.themeMode ?? 'auto'
+const initialThemeMode = args.themeMode ?? config.theme ?? 'auto'
 
 const isTTY = Boolean(process.stdout.isTTY)
 
@@ -166,6 +181,7 @@ const {waitUntilExit} = render(
     initialThemeMode={initialThemeMode}
     outDir={outDir}
     cookies={cookies}
+    defaultFormat={config.format}
     name={args.name}
     onOutcome={result => (outcome = result)}
   />,

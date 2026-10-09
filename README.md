@@ -68,6 +68,32 @@ The exit code is 0 when the file is saved, 1 on failure and 130 when you
 press ^c. When stdout isn't a terminal — a pipe, a script — yoinks runs
 this way on its own, with `--best` unless you pass `--mp3`.
 
+## Configuration
+
+Settings you'd otherwise pass every time go in
+`~/.config/yoinks/config.json` (the same path on every OS):
+
+```json
+{
+  "output": "~/Videos",
+  "cookies": "~/cookies.txt",
+  "theme": "dark",
+  "format": "mp3"
+}
+```
+
+| Setting | Same as | Notes |
+|---|---|---|
+| `output` | `-o` | relative paths are relative to the config file |
+| `cookies` | `--cookies` | |
+| `cookiesFromBrowser` | `--cookies-from-browser` | not together with `cookies` |
+| `theme` | `--theme` | `auto`, `light` or `dark` |
+| `format` | — | `best` or `mp3`: highlighted in the picker, and used when the picker is skipped |
+
+Options on the command line win over the file. A setting yoinks doesn't
+know is an error rather than silently ignored, so a typo can't go
+unnoticed.
+
 ## Signing in
 
 Some videos need an account: age-restricted ones, members-only ones, many
