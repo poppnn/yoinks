@@ -12,6 +12,7 @@ import {ProgressBar} from './components/progress-bar.js'
 import {Shortcuts} from './components/shortcuts.js'
 import {TextInput} from './components/text-input.js'
 import {clickTargetAt, findFrameRow, frameRowSpan, type ClickTarget} from './lib/click-map.js'
+import type {Pick} from './lib/args.js'
 import {cookieArgs, type Cookies} from './lib/cookies.js'
 import {formatBytes, formatDuration, formatEta, formatSpeed, shortenPath, truncate, wrapText} from './lib/format.js'
 import {addToHistory, loadHistory} from './lib/history.js'
@@ -138,6 +139,8 @@ type AppProps = {
   cookies?: Cookies
   /** file name for the first download (from --name) */
   name?: string
+  /** choice to highlight in the picker */
+  defaultFormat?: Pick
   onOutcome: (outcome: Outcome) => void
 }
 
@@ -160,6 +163,7 @@ function AppContent({
   outDir,
   cookies,
   name,
+  defaultFormat,
   onOutcome,
   cycleTheme,
 }: {
@@ -169,6 +173,7 @@ function AppContent({
   outDir: string
   cookies?: Cookies
   name?: string
+  defaultFormat?: Pick
   cycleTheme: () => void
 }) {
   const theme = useTheme()
@@ -238,14 +243,16 @@ function AppContent({
       setNotice(outcome.notice)
       setInfoJson(infoJsonPath)
       setInfo(videoInfo)
-      setChoices(buildChoices(videoInfo))
-      highlightRef.current = 0
+      const built = buildChoices(videoInfo)
+      setChoices(built)
+      // the config's format starts highlighted; the first choice is the best video
+      highlightRef.current = defaultFormat === 'mp3' ? Math.max(0, built.findIndex(c => c.kind === 'audio')) : 0
       setPhase({name: 'picking'})
     } catch (error) {
       if (controller.signal.aborted) return
       setPhase({name: 'error', message: error instanceof Error ? error.message : String(error)})
     }
-  }, [setInfoJson, cookies])
+  }, [setInfoJson, cookies, defaultFormat])
 
   useEffect(() => {
     if (initialUrl) void startProbe(initialUrl)
@@ -475,6 +482,7 @@ function AppContent({
           </Box>
           <Panel title="Download" width={38}>
             <SelectInput
+              initialIndex={highlightRef.current}
               indicatorComponent={ChoiceIndicator}
               itemComponent={ChoiceItem}
               items={choices.map((choice, index) => ({
