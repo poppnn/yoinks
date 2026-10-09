@@ -276,6 +276,10 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     ...(opts.auth ?? []),
     '--no-playlist',
     '--no-warnings',
+    // HLS/DASH sites (X, Twitch, Vimeo…) serve hundreds of small fragments:
+    // fetching four at a time is several times faster
+    '--concurrent-fragments',
+    '4',
     '--newline',
     // --print implies --quiet, which suppresses progress bars and the
     // [Merger]/[ExtractAudio] lines we detect the processing phase from
