@@ -26,13 +26,14 @@ const HELP = `
     $ yoinks                 (prompts for a url)
 
   Options
-    -o, --output <dir>  save downloads to <dir> (default: ~/Downloads)
+    -o, --output <dir>  save downloads to <dir>
     --theme <mode>      use auto, light, or dark for this run
     --update            update yoinks' own copy of yt-dlp now
     -h, --help          show this help
     -v, --version       show version
 
-  Downloads are saved to ~/Downloads unless you pass -o.
+  Downloads are saved to your Downloads folder — wherever you moved it —
+  unless you pass -o.
   yoinks keeps its own yt-dlp up to date (checked once a day). Set
   YOINKS_YT_DLP to a binary name or path to use a different one.
   Powered by yt-dlp — YouTube, X, Instagram, Threads, TikTok & 1800+ sites.
