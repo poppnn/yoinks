@@ -6,7 +6,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Sign in for videos that need an account** with `--cookies <file>` or
+  `--cookies-from-browser <browser>`. Never on by default. If the cookies
+  can't be read — common on Windows, where Chromium browsers lock them —
+  yoinks carries on without them and says why, so public videos still
+  download. (#11)
+- `-o, --output <dir>` saves somewhere else. (#34, thanks @lennin331)
+- `-n, --name <name>` picks the file name. (#6; validation from #7,
+  thanks @aliabedi1)
+- `--best` and `--mp3` skip the picker and the interface, for scripts:
+  only the file path goes to stdout. yoinks also runs this way on its own
+  when its output isn't a terminal.
+- `~/.config/yoinks/config.json` for defaults: output folder, cookies,
+  theme, format.
+- Press `o` when done to open the folder. (from #23, thanks
+  @SuperProCoolName)
+- `yoinks --update` updates yoinks' own yt-dlp right away.
+- Continuous integration on Linux, macOS and Windows with Node 22 and 24.
+- `CONTRIBUTING.md`, `ROADMAP.md` and this changelog.
+
 ### Changed
+
+- Downloads go to your system's Downloads folder even if you moved it
+  (Windows Known Folder, `XDG_DOWNLOAD_DIR` on Linux), instead of always
+  `~/Downloads`. (#22)
+- Fragmented streams (X, Twitch, Vimeo…) download four fragments at a
+  time. (from #23)
 
 - **yoinks now keeps its own yt-dlp up to date.** It used to prefer any
   yt-dlp on your PATH, however old, and never updated the copy it had
@@ -42,12 +69,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   about flags yoinks doesn't have.
 - Centering no longer collapses spacer rows when the leftover space is odd.
 - The dim auto-theme button no longer splits into bands.
-
-### Added
-
-- `yoinks --update` updates yoinks' own yt-dlp right away.
-- Continuous integration on Linux, macOS and Windows with Node 22 and 24.
-- `CONTRIBUTING.md`, `ROADMAP.md` and this changelog.
 
 ## [0.3.1] - 2026-07-16
 
