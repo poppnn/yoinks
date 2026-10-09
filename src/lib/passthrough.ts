@@ -17,7 +17,8 @@ const REFUSED: Array<[flags: string[], instead: string]> = [
   ],
   [['--load-info-json', '-a', '--batch-file'], 'pass one url to yoinks instead'],
   [['-U', '--update', '--update-to'], 'use yoinks --update'],
-  [['--yes-playlist'], 'playlists are not supported yet'],
+  // yoinks picks playlist items itself, one -I per download
+  [['-I', '--playlist-items', '--yes-playlist', '--no-playlist'], 'paste the playlist link, and use --items to pick'],
 ]
 
 /** Why `args` can't be passed to yt-dlp, or undefined if they can. */
