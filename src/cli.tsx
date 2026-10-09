@@ -10,6 +10,7 @@ import {isProbablyUrl} from './lib/platforms.js'
 import {ensureOutputDir, resolveOutputDir, resolveUserPath} from './lib/output-dir.js'
 import type {Cookies} from './lib/cookies.js'
 import {MANAGED_DIR, assetName, installLatest, managedPath, markChecked} from './lib/ytdlp-install.js'
+import {runHeadless} from './headless.js'
 
 // read at runtime from the shipped package.json so npm version bumps
 // can't drift from a hardcoded constant
@@ -27,10 +28,13 @@ const HELP = `
     $ yoinks --cookies ~/cookies.txt https://youtu.be/<age-restricted>
     $ yoinks https://x.com/user/status/123456
     $ yoinks                 (prompts for a url)
+    $ f=$(yoinks --mp3 https://youtu.be/dQw4w9WgXcQ)   (scripts: path on stdout)
 
   Options
     -o, --output <dir>  save downloads to <dir>
     -n, --name <name>   file name instead of the title (extension added)
+    --best              skip the picker: highest quality video
+    --mp3               skip the picker: audio only, as mp3
     --cookies <file>    sign in with a cookies.txt (Netscape format)
     --cookies-from-browser <browser>
                         sign in with a browser's cookies: firefox, chrome,
@@ -101,6 +105,17 @@ try {
 } catch (error) {
   console.error(`yoinks: ${error instanceof Error ? error.message : String(error)}`)
   process.exit(1)
+}
+
+// --best / --mp3, or output that isn't a terminal (a pipe, a script):
+// no interface — a full-screen app would just be noise there
+if (args.pick || !process.stdout.isTTY) {
+  if (!args.initialUrl) {
+    console.error(`yoinks: ${args.pick ? `--${args.pick} needs a url` : 'no url given, and no terminal to ask for one'}`)
+    process.exit(1)
+  }
+  const code = await runHeadless({url: args.initialUrl, pick: args.pick ?? 'best', outDir, cookies, name: args.name})
+  process.exit(code)
 }
 
 const initialUrl = args.initialUrl

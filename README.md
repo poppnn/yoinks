@@ -54,6 +54,20 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 
 <img src="assets/download-options.png" alt="yoinks format picker — resolutions with estimated file sizes, plus audio-only mp3" width="100%">
 
+## Scripting
+
+`--best` (highest quality video) or `--mp3` (audio only) skip the picker
+and the interface: progress goes to stderr, and the saved file's path is
+the only thing printed on stdout.
+
+```sh
+f=$(yoinks --mp3 -n "my song" https://youtu.be/dQw4w9WgXcQ) && echo "got $f"
+```
+
+The exit code is 0 when the file is saved, 1 on failure and 130 when you
+press ^c. When stdout isn't a terminal — a pipe, a script — yoinks runs
+this way on its own, with `--best` unless you pass `--mp3`.
+
 ## Signing in
 
 Some videos need an account: age-restricted ones, members-only ones, many

@@ -50,6 +50,13 @@ test('parses --name, keeping the name a plain file name', () => {
   assert.match(parseArgs(['--name', 'NUL']).error ?? '', /reserved/)
 })
 
+test('parses --best and --mp3, but not both', () => {
+  assert.equal(parseArgs(['--best', 'https://x.com/v']).pick, 'best')
+  assert.equal(parseArgs(['https://x.com/v', '--mp3']).pick, 'mp3')
+  assert.equal(parseArgs(['https://x.com/v']).pick, undefined)
+  assert.match(parseArgs(['--best', '--mp3']).error ?? '', /either --best or --mp3/)
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)
