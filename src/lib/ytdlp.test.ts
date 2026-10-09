@@ -3,7 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import {download, type DownloadChoice} from './ytdlp.js'
+import {describeYtDlpError, download, type DownloadChoice} from './ytdlp.js'
+import {managedPath} from './ytdlp-install.js'
 
 const choice: DownloadChoice = {label: 'best', kind: 'video', args: []}
 const noop = {onProgress: () => {}, onProcessing: () => {}}
@@ -69,4 +70,35 @@ setInterval(() => {}, 1000)`,
   assert.deepEqual(await fs.readdir(outDir), [])
   process.kill(Number(await fs.readFile(pidFile, 'utf8')))
   await fs.rm(dir, {recursive: true, force: true})
+})
+
+// real yt-dlp output, with the warnings it prints before the error
+const AGE_GATE = `WARNING: [youtube] AGrDHYmhuS0: some warning
+ERROR: [youtube] AGrDHYmhuS0: Sign in to confirm your age. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+`
+const NO_FORMAT =
+  'ERROR: [youtube] HyLCgkQtluw: Requested format is not available. Use --list-formats for a list of available formats\n'
+
+test("explains login walls without pointing at yt-dlp flags yoinks doesn't have", () => {
+  const message = describeYtDlpError(AGE_GATE, managedPath())
+  assert.match(message, /needs a signed-in account/)
+  assert.doesNotMatch(message, /cookies-from-browser|https:/)
+  assert.match(describeYtDlpError('ERROR: [Instagram] x: login required\n', 'yt-dlp'), /signed-in account/)
+})
+
+test('suggests the right update for errors an outdated yt-dlp causes', () => {
+  assert.equal(
+    describeYtDlpError(NO_FORMAT, managedPath()),
+    'HyLCgkQtluw: Requested format is not available. This often means yt-dlp is out of date. Run “yoinks --update” and try again.',
+  )
+  assert.match(describeYtDlpError(NO_FORMAT, 'yt-dlp'), /Update your yt-dlp and try again\.$/)
+  assert.match(describeYtDlpError('ERROR: unable to download video data: HTTP Error 403: Forbidden\n', '/opt/yt-dlp'), /Update \/opt\/yt-dlp/)
+})
+
+test('passes other errors through, and returns nothing without an error line', () => {
+  assert.equal(
+    describeYtDlpError('ERROR: [generic] Unable to download webpage: HTTP Error 404: Not Found\n', 'yt-dlp'),
+    'Unable to download webpage: HTTP Error 404: Not Found',
+  )
+  assert.equal(describeYtDlpError('WARNING: just a warning\n', 'yt-dlp'), '')
 })
