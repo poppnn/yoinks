@@ -45,6 +45,8 @@ button, the format list and the footer hints are all clickable, and
 clicking the logo takes you back home. Files are saved to your Downloads
 folder — the one your system uses, even if you moved it — or to any folder
 with `-o <dir>`. The file path is printed to your terminal when you're done.
+When it's saved, `o` opens its folder and `c` copies the file itself, ready
+to paste into a chat or another folder.
 
 The default `auto` theme uses your terminal's own foreground and background,
 so it follows light and dark terminal themes without guessing. Press `^t` or
@@ -53,6 +55,18 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 `--theme dark` to choose the starting theme for one launch.
 
 <img src="assets/download-options.png" alt="yoinks format picker — resolutions with estimated file sizes, plus audio-only mp3" width="100%">
+
+### Accessibility
+
+- `--plain` keeps everything in the normal scrollback, at its natural
+  height, with no mouse tracking and no animation — the mode to use with a
+  screen reader. It is also used when `TERM=dumb`.
+- `--no-mouse` leaves text selection to your terminal.
+- `--no-motion` keeps the logo still.
+- The default `auto` theme prints no colours at all, only bold, dim and
+  inverse, so it already honours `NO_COLOR`.
+
+Each has a config setting, so you can set it once.
 
 ## Scripting
 
@@ -89,10 +103,27 @@ Settings you'd otherwise pass every time go in
 | `cookiesFromBrowser` | `--cookies-from-browser` | not together with `cookies` |
 | `theme` | `--theme` | `auto`, `light` or `dark` |
 | `format` | — | `best` or `mp3`: highlighted in the picker, and used when the picker is skipped |
+| `plain` | `--plain` | `true` or `false` |
+| `mouse` | `--no-mouse` | `false` turns it off |
+| `motion` | `--no-motion` | `false` turns it off |
 
 Options on the command line win over the file. A setting yoinks doesn't
 know is an error rather than silently ignored, so a typo can't go
 unnoticed.
+
+## Passing options to yt-dlp
+
+Anything after `--` goes to yt-dlp as is:
+
+```sh
+yoinks <url> -- --proxy socks5://127.0.0.1:9050
+yoinks <url> -- --write-auto-subs --embed-subs --sub-langs en
+```
+
+Files yt-dlp writes alongside the download (subtitles, thumbnails…) are
+kept next to it. Options that would break yoinks are refused, with what to
+use instead: output paths, the format (the picker chooses it), and
+anything that changes the output yoinks reads for progress.
 
 ## Signing in
 
