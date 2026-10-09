@@ -84,16 +84,22 @@ Deux écarts avec le plan initial, appris en le réalisant :
 
 ### Phase 2 — Contrôle utilisateur · v0.5
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| Mode scriptable : `--best` / `--mp3` sautent le menu, sortie non interactive si stdout n'est pas un TTY | M | README d'origine |
-| Option `-o, --output <dossier>` | S | #34, PR #35 |
-| Dossier par défaut = le vrai dossier Téléchargements : Known Folder sous Windows, `XDG_DOWNLOAD_DIR` sous Linux | S | R7, #22 |
-| Fichier de configuration `~/.config/yoinks/config.json` : dossier, format par défaut, cookies | M | — |
-| **Cookies, uniquement sur option** : `--cookies <fichier>` et `--cookies-from-browser <navigateur>`, ou via la config. Ne jamais les imposer par défaut (voir PR #23). | M | R6, #11 |
-| Nom de fichier personnalisé | S | #6, PR #7 |
-| Ouvrir le dossier après téléchargement (touche `o`) | S | PR #23 |
-| `--concurrent-fragments 4` | S | PR #23 |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| Mode scriptable : `--best` / `--mp3` sautent le menu, sortie non interactive si stdout n'est pas un TTY | M | README d'origine | ✅ |
+| Option `-o, --output <dossier>` | S | #34, PR #35 | ✅ repris de #35, avec son test rendu portable sous Windows |
+| Dossier par défaut = le vrai dossier Téléchargements : Known Folder sous Windows, `XDG_DOWNLOAD_DIR` sous Linux | S | R7, #22 | ✅ |
+| Fichier de configuration `~/.config/yoinks/config.json` : dossier, format par défaut, cookies, thème | M | — | ✅ |
+| **Cookies, uniquement sur option** : `--cookies <fichier>` et `--cookies-from-browser <navigateur>`, ou via la config | M | R6, #11 | ✅ avec repli sans cookies |
+| Nom de fichier personnalisé : `-n, --name` | S | #6, PR #7 | ✅ validation reprise de #7 · ⏳ touche `s` dans le sélecteur non reprise |
+| Ouvrir le dossier après téléchargement (touche `o`) | S | PR #23 | ✅ sans le délai qui tuait le gestionnaire de fichiers |
+| `--concurrent-fragments 4` | S | PR #23 | ✅ |
+
+Ce que la réalisation a ajouté ou corrigé par rapport au plan :
+
+- **Le « format » de la config présélectionne un choix ; il ne saute pas le sélecteur.** Sinon, lancer `yoinks` sans lien deviendrait impossible. Il ne sert à sauter le sélecteur que là où celui-ci est déjà sauté, dans un pipe.
+- **Le test de #35 échouait sous Windows**, ce que personne n'avait vu en amont faute de CI.
+- **Constaté pendant les tests** : la vidéo « best » sort en AV1/Opus dans un `.mp4`. Le point R5 de la phase 3 est donc bien réel.
 
 > **À retenir sur les cookies.** Sous Windows, `--cookies-from-browser chrome` échoue avec Chrome 127+ (« Failed to decrypt with DPAPI », yt-dlp #10927, à cause de l'App-Bound Encryption), et Edge est concerné aussi. Un échec d'extraction est **fatal pour tous les téléchargements**, y compris les vidéos publiques. Il faut donc :
 > - laisser les cookies en option, jamais par défaut ;
