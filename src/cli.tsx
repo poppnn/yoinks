@@ -35,7 +35,9 @@ const HELP = `
 
   Options
     -o, --output <dir>  save downloads to <dir>
-    -n, --name <name>   file name instead of the title (extension added)
+    -n, --name <name>   file name instead of the title (extension added);
+                        for a playlist, the folder name
+    --items <list>      playlist items to get, e.g. 1-3,7 (default: all)
     --best              skip the picker: highest quality video
     --mp3               skip the picker: audio only, as mp3
     --cookies <file>    sign in with a cookies.txt (Netscape format)
@@ -134,7 +136,7 @@ if (args.pick || !process.stdout.isTTY) {
     process.exit(1)
   }
   const pick = args.pick ?? config.format ?? 'best'
-  const code = await runHeadless({url: args.initialUrl, pick, outDir, cookies, name: args.name, ytdlpArgs: args.ytdlpArgs})
+  const code = await runHeadless({url: args.initialUrl, pick, outDir, cookies, name: args.name, ytdlpArgs: args.ytdlpArgs, items: args.items})
   process.exit(code)
 }
 

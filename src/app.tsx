@@ -1,10 +1,12 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react'
 import fs from 'node:fs/promises'
 import os from 'node:os'
+import path from 'node:path'
 import {Box, Text, useApp, useInput, useStdout} from 'ink'
 import SelectInput, {type IndicatorProps, type ItemProps} from 'ink-select-input'
 import Spinner from 'ink-spinner'
 import {FramedInput, frameButtonWidth} from './components/framed-input.js'
+import {Checklist} from './components/checklist.js'
 import {FullScreen} from './components/fullscreen.js'
 import {Logo} from './components/logo.js'
 import {Panel} from './components/panel.js'
@@ -18,6 +20,7 @@ import {formatBytes, formatDuration, formatEta, formatSpeed, shortenPath, trunca
 import {addToHistory, loadHistory} from './lib/history.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
 import {revealInFileManager} from './lib/reveal.js'
+import {downloadItems, folderName, itemTemplate, type PlaylistInfo} from './lib/playlist.js'
 import {copyFileToClipboard} from './lib/clipboard.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
 import {nextThemeMode, ThemeProvider, type ThemeMode, useTheme} from './theme.js'
@@ -26,6 +29,7 @@ import {
   download,
   ensureYtDlp,
   findFfmpeg,
+  playlistChoices,
   probe,
   probeWithCookies,
   type DownloadChoice,
@@ -34,6 +38,8 @@ import {
 } from './lib/ytdlp.js'
 
 const YOINK_BUTTON = 'yoink'
+/** playlist rows shown at once; longer lists scroll */
+const LIST_ROWS = 8
 const DONE_LABEL = '↵ yoink another'
 const TAGLINE = 'yoink any video. paste. yoink. done.'
 
@@ -70,6 +76,10 @@ const Gap = ({lines = 1}: {lines?: number}) => (
 
 // fixed-width slots — the centered line must not change width as values tick,
 // otherwise the whole layout shifts on every progress update
+function totalDuration(playlist: PlaylistInfo): number {
+  return playlist.entries.reduce((sum, entry) => sum + (entry.duration ?? 0), 0)
+}
+
 function partLabel(progress: DownloadProgress): string {
   // explains the bar resetting between files (video, then audio)
   return progress.totalParts > 1 ? `part ${progress.part + 1}/${progress.totalParts}  ` : ''
@@ -95,6 +105,7 @@ export type Display = {plain: boolean; mouse: boolean; motion: boolean}
 type Phase =
   | {name: 'input'; warning?: string}
   | {name: 'probing'; status: string}
+  | {name: 'selecting'}
   | {name: 'picking'}
   | {
       name: 'downloading'
@@ -102,8 +113,16 @@ type Phase =
       progress?: DownloadProgress
       processing: boolean
       refreshing?: boolean
+      /** which playlist item is downloading */
+      item?: {position: number; count: number; title: string}
     }
-  | {name: 'done'; filepath: string}
+  | {
+      name: 'done'
+      /** the saved file — for a playlist, the first one, so "o" opens its folder */
+      filepath: string
+      /** a playlist's folder and how its items went */
+      playlist?: {folder: string; saved: number; failed: Array<{title: string; error: string}>}
+    }
   | {name: 'error'; message: string}
 
 const HINTS: Record<Phase['name'], Array<[string, string]>> = {
@@ -113,6 +132,13 @@ const HINTS: Record<Phase['name'], Array<[string, string]>> = {
   ],
   probing: [
     ['esc', 'cancel'],
+    ['^c', 'quit'],
+  ],
+  selecting: [
+    ['↵', 'next'],
+    ['space', 'tick'],
+    ['a', 'all'],
+    ['esc', 'back'],
     ['^c', 'quit'],
   ],
   picking: [
@@ -197,6 +223,10 @@ function AppContent({
   const [platform, setPlatform] = useState<Platform>()
   const [info, setInfo] = useState<VideoInfo>()
   const [choices, setChoices] = useState<DownloadChoice[]>([])
+  // a playlist link: its items, which are ticked (by playlist index), and the row under the cursor
+  const [playlist, setPlaylist] = useState<PlaylistInfo>()
+  const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set())
+  const [cursor, setCursor] = useState(0)
   const ytdlpRef = useRef('')
   const highlightRef = useRef(0) // choice under the cursor, for the ↵ hint click
   const infoJsonRef = useRef<string | undefined>(undefined)
@@ -246,6 +276,22 @@ function AppContent({
         auth => probe(ytdlp, targetUrl, controller.signal, auth, ytdlpArgs),
         cookieArgs(cookies),
       )
+      if (outcome.result.playlist) {
+        if (controller.signal.aborted) return
+        const found = outcome.result.playlist
+        authRef.current = outcome.auth
+        setNotice(outcome.notice)
+        setPlaylist(found)
+        setTicked(new Set(found.entries.map(entry => entry.index)))
+        setCursor(0)
+        setInfo({title: found.title})
+        const built = playlistChoices()
+        setChoices(built)
+        highlightRef.current = defaultFormat === 'mp3' ? built.findIndex(c => c.kind === 'audio') : 0
+        setPhase({name: 'selecting'})
+        return
+      }
+      setPlaylist(undefined)
       const {info: videoInfo, infoJsonPath} = outcome.result
       if (controller.signal.aborted) {
         void fs.rm(infoJsonPath, {force: true}).catch(() => {})
@@ -282,12 +328,28 @@ function AppContent({
     void copyFileToClipboard(filepath).then(setCopied)
   }, [])
 
+  const toggleItem = (index: number) =>
+    setTicked(previous => {
+      const next = new Set(previous)
+      if (!next.delete(index)) next.add(index)
+      return next
+    })
+  // all ticked → none, otherwise → all
+  const toggleAll = () =>
+    setTicked(previous =>
+      playlist && previous.size === playlist.entries.length ? new Set() : new Set(playlist?.entries.map(entry => entry.index)),
+    )
+  const continueToFormats = () => {
+    if (ticked.size > 0) setPhase({name: 'picking'})
+  }
+
   const resetToInput = useCallback(() => {
     setUrl('')
     setUrlInput('')
     setPlatform(undefined)
     setInfo(undefined)
     setChoices([])
+    setPlaylist(undefined)
     setInfoJson(undefined)
     setPhase({name: 'input'})
   }, [setInfoJson])
@@ -313,11 +375,22 @@ function AppContent({
         openFolder(phase.filepath)
         return
       }
-      if (input === 'c' && !key.ctrl && !key.meta && phase.name === 'done') {
+      if (input === 'c' && !key.ctrl && !key.meta && phase.name === 'done' && !phase.playlist) {
         copyFile(phase.filepath)
         return
       }
-      if (key.escape && (phase.name === 'picking' || phase.name === 'error' || phase.name === 'done')) resetToInput()
+      if (phase.name === 'selecting' && playlist) {
+        const count = playlist.entries.length
+        if (key.upArrow || input === 'k') return setCursor(c => Math.max(0, c - 1))
+        if (key.downArrow || input === 'j') return setCursor(c => Math.min(count - 1, c + 1))
+        if (key.pageUp) return setCursor(c => Math.max(0, c - LIST_ROWS))
+        if (key.pageDown) return setCursor(c => Math.min(count - 1, c + LIST_ROWS))
+        if (input === ' ') return toggleItem(playlist.entries[cursor]!.index)
+        if (input === 'a') return toggleAll()
+        if (key.return) return continueToFormats()
+      }
+      if (key.escape && (phase.name === 'selecting' || phase.name === 'picking' || phase.name === 'error' || phase.name === 'done'))
+        resetToInput()
       if (key.escape && (phase.name === 'probing' || phase.name === 'downloading')) cancelRun()
       if (key.return && phase.name === 'error') backToUrl()
       if (key.return && phase.name === 'done') resetToInput()
@@ -354,6 +427,41 @@ function AppContent({
       }
       try {
         const ffmpeg = await findFfmpeg()
+        if (playlist) {
+          const entries = playlist.entries.filter(entry => ticked.has(entry.index))
+          // --name names the folder; the files are named after their items
+          const folder = path.join(outDir, folderName(nameRef.current ?? playlist.title))
+          const results = await downloadItems(
+            entries,
+            entry =>
+              download(
+                {
+                  ytdlp: ytdlpRef.current,
+                  ffmpeg,
+                  url,
+                  choice,
+                  outDir: folder,
+                  auth: authRef.current,
+                  extra: ytdlpArgs,
+                  playlistItem: entry.index,
+                  template: itemTemplate(entry, playlist.entries.length),
+                },
+                handlers,
+                controller.signal,
+              ),
+            (position, entry) =>
+              setPhase({name: 'downloading', choice, processing: false, item: {position, count: entries.length, title: entry.title}}),
+            controller.signal,
+          )
+          const saved = results.flatMap(result => (result.filepath ? [result.filepath] : []))
+          const failed = results.flatMap(({entry, error}) => (error ? [{title: entry.title, error}] : []))
+          if (saved.length === 0) throw new Error(failed[0]?.error ?? 'Nothing was downloaded.')
+          nameRef.current = undefined
+          onOutcome({filepath: folder})
+          setHistory(addToHistory(url))
+          setPhase({name: 'done', filepath: saved[0]!, playlist: {folder, saved: saved.length, failed}})
+          return
+        }
         const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current, extra: ytdlpArgs}
         let filepath: string
         try {
@@ -379,6 +487,8 @@ function AppContent({
   }
 
   let hints: Array<[string, string]> = [...HINTS[phase.name], ['^t', `theme:${theme.mode}`]]
+  // "copy file" is for one file
+  if (phase.name === 'done' && phase.playlist) hints = hints.filter(([key]) => key !== 'c')
   if (phase.name === 'input' && history.length > 0) {
     hints = [hints[0]!, ['↑', 'history'], ...hints.slice(1)]
   }
@@ -390,8 +500,13 @@ function AppContent({
     if (key === '^c') return () => exit()
     if (key === '^t') return cycleTheme
     if (key === 'o' && phase.name === 'done') return () => openFolder(phase.filepath)
-    if (key === 'c' && phase.name === 'done') return () => copyFile(phase.filepath)
+    if (key === 'c' && phase.name === 'done' && !phase.playlist) return () => copyFile(phase.filepath)
     if (key === 'esc') return phase.name === 'probing' || phase.name === 'downloading' ? cancelRun : resetToInput
+    if (phase.name === 'selecting' && playlist) {
+      if (key === 'space') return () => toggleItem(playlist.entries[cursor]!.index)
+      if (key === 'a') return toggleAll
+      if (key === '↵') return continueToFormats
+    }
     if (key === '↵') {
       if (phase.name === 'input') return () => handleUrlSubmit(urlInput)
       if (phase.name === 'picking') return () => handlePick({value: highlightRef.current})
@@ -477,6 +592,20 @@ function AppContent({
         </Box>
       )}
 
+      {phase.name === 'selecting' && playlist && (
+        <Box flexDirection="column" width={contentWidth}>
+          <Text bold color={theme.primary}>
+            {truncate(playlist.title, contentWidth)}
+          </Text>
+          <Text color={theme.gray} dimColor={theme.dimSecondary}>
+            ▸ {platform?.label} · {playlist.entries.length} {playlist.entries.length === 1 ? 'video' : 'videos'}
+            {totalDuration(playlist) ? ` · ${formatDuration(totalDuration(playlist))}` : ''} · {ticked.size} ticked
+          </Text>
+          {notice && <Text color={theme.gray} dimColor={theme.dimSecondary}>{truncate(`⚠ ${notice}`, contentWidth)}</Text>}
+          <Checklist entries={playlist.entries} selected={ticked} cursor={cursor} width={contentWidth} rows={LIST_ROWS} />
+        </Box>
+      )}
+
       {phase.name === 'picking' && platform && (
         <Box width={contentWidth}>
           <Box flexDirection="column" flexGrow={1} flexBasis={0} paddingTop={1} paddingRight={3}>
@@ -490,6 +619,7 @@ function AppContent({
             <Gap />
             <Text color={theme.gray} dimColor={theme.dimSecondary}>
               ▸ {platform.label}
+              {playlist ? ` · ${ticked.size} of ${playlist.entries.length} videos` : ''}
               {info?.duration ? ` · ${formatDuration(info.duration)}` : ''}
               {info?.uploader ? ` · ${info.uploader}` : ''}
             </Text>
@@ -524,7 +654,11 @@ function AppContent({
       {phase.name === 'downloading' && (
         <Box flexDirection="column" alignItems="center">
           <Text color={theme.gray} dimColor={theme.dimSecondary}>
-            {info?.title ? `${truncate(info.title, 42)} · ` : ''}
+            {phase.item
+              ? `${phase.item.position + 1}/${phase.item.count} · ${truncate(phase.item.title, 38)} · `
+              : info?.title
+                ? `${truncate(info.title, 42)} · `
+                : ''}
             {phase.choice.label}
           </Text>
           <Gap />
@@ -577,10 +711,26 @@ function AppContent({
       {phase.name === 'done' && (
         <Box flexDirection="column" alignItems="center">
           <Text>
-            <Text bold color={theme.primary}>✓ yoinked! </Text>
-            <Text color={theme.primary}>find your file in:</Text>
+            <Text bold color={theme.primary}>
+              {phase.playlist
+                ? `✓ yoinked ${phase.playlist.saved} of ${phase.playlist.saved + phase.playlist.failed.length}! `
+                : '✓ yoinked! '}
+            </Text>
+            <Text color={theme.primary}>{phase.playlist ? 'find them in:' : 'find your file in:'}</Text>
           </Text>
-          <Text color={theme.gray} dimColor={theme.dimSecondary}>{shortenPath(phase.filepath, os.homedir(), 60)}</Text>
+          <Text color={theme.gray} dimColor={theme.dimSecondary}>
+            {shortenPath(phase.playlist?.folder ?? phase.filepath, os.homedir(), 60)}
+          </Text>
+          {phase.playlist?.failed.slice(0, 3).map(({title, error}) => (
+            <Text key={title} color={theme.gray} dimColor={theme.dimSecondary}>
+              ✗ {truncate(title, 28)} — {truncate(error, 36)}
+            </Text>
+          ))}
+          {phase.playlist && phase.playlist.failed.length > 3 ? (
+            <Text color={theme.gray} dimColor={theme.dimSecondary}>
+              ✗ and {phase.playlist.failed.length - 3} more
+            </Text>
+          ) : null}
           {revealFailed ? (
             <Text color={theme.gray} dimColor={theme.dimSecondary}>✗ no file manager to open it with</Text>
           ) : null}

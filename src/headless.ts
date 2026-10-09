@@ -1,12 +1,15 @@
 import fs from 'node:fs/promises'
+import path from 'node:path'
 import type {Pick} from './lib/args.js'
 import {cookieArgs, type Cookies} from './lib/cookies.js'
 import {formatBytes, formatEta, formatSpeed} from './lib/format.js'
+import {downloadItems, folderName, itemTemplate, selectItems} from './lib/playlist.js'
 import {
   buildChoices,
   download,
   ensureYtDlp,
   findFfmpeg,
+  playlistChoices,
   probe,
   probeWithCookies,
   type DownloadProgress,
@@ -14,8 +17,9 @@ import {
 
 /**
  * Download without the interface, for scripts: status and progress go to
- * stderr (only when it's a terminal), the saved file's path to stdout, and
- * the exit code says how it went — 0 done, 1 failed, 130 cancelled.
+ * stderr (only when it's a terminal), the saved file's path to stdout — one
+ * line per item for a playlist — and the exit code says how it went: 0 done,
+ * 1 failed (any item, for a playlist), 130 cancelled.
  */
 export async function runHeadless(opts: {
   url: string
@@ -24,6 +28,8 @@ export async function runHeadless(opts: {
   cookies?: Cookies
   name?: string
   ytdlpArgs?: string[]
+  /** playlist items to download, e.g. "1-3,7" */
+  items?: string
 }): Promise<number> {
   const controller = new AbortController()
   const cancel = () => controller.abort()
@@ -54,6 +60,56 @@ export async function runHeadless(opts: {
       clear()
       process.stderr.write(`yoinks: ${notice}\n`)
     }
+
+    if (result.playlist) {
+      const {playlist} = result
+      const entries = opts.items ? selectItems(opts.items, playlist.entries) : playlist.entries
+      const choice = playlistChoices().find(c => c.kind === (opts.pick === 'mp3' ? 'audio' : 'video'))!
+      // -n names the folder here; a playlist's files are named after their items
+      const folder = path.join(opts.outDir, folderName(opts.name ?? playlist.title))
+      const ffmpeg = await findFfmpeg()
+      let current = ''
+      const handlers = {
+        onProgress: (progress: DownloadProgress) => status(`${current} · ${progressLine(choice.label, progress)}`),
+        onProcessing: () => status(`${current} · ${opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'}`),
+      }
+      const results = await downloadItems(
+        entries,
+        async entry => {
+          const filepath = await download(
+            {
+              ytdlp,
+              ffmpeg,
+              url: opts.url,
+              choice,
+              outDir: folder,
+              auth,
+              extra: opts.ytdlpArgs,
+              playlistItem: entry.index,
+              template: itemTemplate(entry, playlist.entries.length),
+            },
+            handlers,
+            controller.signal,
+          )
+          // as each one lands, so a script can start on it
+          clear()
+          process.stdout.write(`${filepath}\n`)
+          return filepath
+        },
+        (position, entry) => {
+          current = `${position + 1}/${entries.length}`
+          status(`${current} · ${entry.title}`)
+        },
+        controller.signal,
+      )
+
+      clear()
+      const failed = results.filter(r => r.error)
+      for (const {entry, error} of failed) process.stderr.write(`yoinks: ${entry.index}. ${entry.title} — ${error}\n`)
+      if (failed.length > 0) process.stderr.write(`yoinks: ${results.length - failed.length} of ${results.length} saved\n`)
+      return failed.length > 0 ? 1 : 0
+    }
+    if (opts.items) process.stderr.write('yoinks: --items is for playlists; this link is a single video\n')
 
     const choice = buildChoices(result.info).find(c => c.kind === (opts.pick === 'mp3' ? 'audio' : 'video'))!
     const handlers = {
