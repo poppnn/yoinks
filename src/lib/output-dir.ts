@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-//absolute path set to user defined dir, or the ~/Downloads on default.
+/** Absolute folder to save into: the -o value with ~ expanded, or ~/Downloads. */
 export function resolveOutputDir(flag?: string, homedir = os.homedir()): string {
   if (flag === undefined) return path.join(homedir, 'Downloads')
   const expanded =
@@ -12,7 +12,7 @@ export function resolveOutputDir(flag?: string, homedir = os.homedir()): string 
   return path.resolve(expanded)
 }
 
-//mkdir if it doesn't exist.
+/** Creates the folder if needed and checks we can write to it. */
 export function ensureOutputDir(dir: string): void {
   try {
     fs.mkdirSync(dir, {recursive: true})
