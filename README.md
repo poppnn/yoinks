@@ -42,8 +42,9 @@ yoinks takes over the terminal (full-screen, centered — and restores your
 scrollback on exit). Pick a format with ↑/↓ (or j/k, or number keys) and
 hit enter. `esc` goes back, `^c` quits. Or just use the mouse — the yoink
 button, the format list and the footer hints are all clickable, and
-clicking the logo takes you back home. Files are saved to `~/Downloads` by default,
-use `-o <dir>` to save to a folder of your choice and the file path is printed to your terminal when you're done.  
+clicking the logo takes you back home. Files are saved to your Downloads
+folder — the one your system uses, even if you moved it — or to any folder
+with `-o <dir>`. The file path is printed to your terminal when you're done.
 
 The default `auto` theme uses your terminal's own foreground and background,
 so it follows light and dark terminal themes without guessing. Press `^t` or
