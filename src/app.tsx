@@ -136,6 +136,8 @@ type AppProps = {
   initialThemeMode?: ThemeMode
   outDir: string
   cookies?: Cookies
+  /** file name for the first download (from --name) */
+  name?: string
   onOutcome: (outcome: Outcome) => void
 }
 
@@ -157,6 +159,7 @@ function AppContent({
   clipboardUrl,
   outDir,
   cookies,
+  name,
   onOutcome,
   cycleTheme,
 }: {
@@ -165,6 +168,7 @@ function AppContent({
   onOutcome: (outcome: Outcome) => void
   outDir: string
   cookies?: Cookies
+  name?: string
   cycleTheme: () => void
 }) {
   const theme = useTheme()
@@ -181,6 +185,8 @@ function AppContent({
   const infoJsonRef = useRef<string | undefined>(undefined)
   // cookie arguments the probe succeeded with — the download reuses them
   const authRef = useRef<string[]>([])
+  // --name is meant for the link it came with, not every "yoink another"
+  const nameRef = useRef(name)
   // e.g. cookies we couldn't read, so we carried on without signing in
   const [notice, setNotice] = useState<string>()
   const abortRef = useRef<AbortController | undefined>(undefined)
@@ -318,7 +324,7 @@ function AppContent({
       }
       try {
         const ffmpegLocation = await findFfmpeg()
-        const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir, auth: authRef.current}
+        const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir, auth: authRef.current, name: nameRef.current}
         let filepath: string
         try {
           // reuse the probe's metadata — starts immediately instead of re-extracting
@@ -331,6 +337,7 @@ function AppContent({
           )
           filepath = await download(base, handlers, controller.signal)
         }
+        nameRef.current = undefined
         onOutcome({filepath})
         setHistory(addToHistory(url))
         setPhase({name: 'done', filepath})

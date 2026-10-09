@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {formatBytes} from './format.js'
+import {saveAsOutputTemplate} from './save-as.js'
 import {assetName, dueForCheck, installLatest, managedPath, markChecked} from './ytdlp-install.js'
 
 // async on purpose: a spawnSync here blocks the event loop, which freezes
@@ -237,6 +238,8 @@ type DownloadOptions = {
   outDir: string
   /** cookie arguments, the same ones the probe succeeded with */
   auth?: string[]
+  /** file name to use instead of the title; the extension comes from the format */
+  name?: string
 }
 
 export async function download(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
@@ -291,7 +294,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     'after_move:filepath',
     '--no-simulate',
     '-o',
-    path.join(opts.outDir, '%(title).60s.%(ext)s'),
+    saveAsOutputTemplate(opts.outDir, opts.name),
   ]
   if (opts.ffmpegLocation) args.push('--ffmpeg-location', opts.ffmpegLocation)
 

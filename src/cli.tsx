@@ -30,6 +30,7 @@ const HELP = `
 
   Options
     -o, --output <dir>  save downloads to <dir>
+    -n, --name <name>   file name instead of the title (extension added)
     --cookies <file>    sign in with a cookies.txt (Netscape format)
     --cookies-from-browser <browser>
                         sign in with a browser's cookies: firefox, chrome,
@@ -150,6 +151,7 @@ const {waitUntilExit} = render(
     initialThemeMode={initialThemeMode}
     outDir={outDir}
     cookies={cookies}
+    name={args.name}
     onOutcome={result => (outcome = result)}
   />,
   // keep a copy of every frame so clicks can be hit-tested against it
