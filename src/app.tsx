@@ -147,6 +147,8 @@ type AppProps = {
   /** choice to highlight in the picker */
   defaultFormat?: Pick
   display?: Display
+  /** the user's own yt-dlp options, from after -- */
+  ytdlpArgs?: string[]
   onOutcome: (outcome: Outcome) => void
 }
 
@@ -171,6 +173,7 @@ function AppContent({
   name,
   defaultFormat,
   display = {plain: false, mouse: true, motion: true},
+  ytdlpArgs,
   onOutcome,
   cycleTheme,
 }: {
@@ -182,6 +185,7 @@ function AppContent({
   name?: string
   defaultFormat?: Pick
   display?: Display
+  ytdlpArgs?: string[]
   cycleTheme: () => void
 }) {
   const theme = useTheme()
@@ -239,7 +243,7 @@ function AppContent({
       if (controller.signal.aborted) return
       setPhase({name: 'probing', status: 'fetching video info…'})
       const outcome = await probeWithCookies(
-        auth => probe(ytdlp, targetUrl, controller.signal, auth),
+        auth => probe(ytdlp, targetUrl, controller.signal, auth, ytdlpArgs),
         cookieArgs(cookies),
       )
       const {info: videoInfo, infoJsonPath} = outcome.result
@@ -260,7 +264,7 @@ function AppContent({
       if (controller.signal.aborted) return
       setPhase({name: 'error', message: error instanceof Error ? error.message : String(error)})
     }
-  }, [setInfoJson, cookies, defaultFormat])
+  }, [setInfoJson, cookies, defaultFormat, ytdlpArgs])
 
   useEffect(() => {
     if (initialUrl) void startProbe(initialUrl)
@@ -350,7 +354,7 @@ function AppContent({
       }
       try {
         const ffmpeg = await findFfmpeg()
-        const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current}
+        const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current, extra: ytdlpArgs}
         let filepath: string
         try {
           // reuse the probe's metadata — starts immediately instead of re-extracting

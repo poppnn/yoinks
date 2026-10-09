@@ -65,6 +65,17 @@ test('parses the display options', () => {
   assert.equal(parseArgs([]).plain, undefined)
 })
 
+test('passes everything after -- to yt-dlp, checked', () => {
+  const parsed = parseArgs(['https://x.com/v', '--mp3', '--', '--proxy', 'socks5://h:1', '--cookies', 'c.txt'])
+  assert.equal(parsed.initialUrl, 'https://x.com/v')
+  assert.equal(parsed.pick, 'mp3')
+  assert.deepEqual(parsed.ytdlpArgs, ['--proxy', 'socks5://h:1', '--cookies', 'c.txt'])
+  // yoinks' own --cookies check only looks before --
+  assert.equal(parsed.error, undefined)
+  assert.match(parseArgs(['https://x.com/v', '--', '-o', 'x']).error ?? '', /can't be passed to yt-dlp/)
+  assert.equal(parseArgs(['https://x.com/v']).ytdlpArgs, undefined)
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)

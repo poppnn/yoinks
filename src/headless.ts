@@ -23,6 +23,7 @@ export async function runHeadless(opts: {
   outDir: string
   cookies?: Cookies
   name?: string
+  ytdlpArgs?: string[]
 }): Promise<number> {
   const controller = new AbortController()
   const cancel = () => controller.abort()
@@ -45,7 +46,7 @@ export async function runHeadless(opts: {
     const ytdlp = await ensureYtDlp(status, controller.signal)
     status('fetching video info…')
     const {result, auth, notice} = await probeWithCookies(
-      cookies => probe(ytdlp, opts.url, controller.signal, cookies),
+      cookies => probe(ytdlp, opts.url, controller.signal, cookies, opts.ytdlpArgs),
       cookieArgs(opts.cookies),
     )
     infoJsonPath = result.infoJsonPath
@@ -59,7 +60,7 @@ export async function runHeadless(opts: {
       onProgress: (progress: DownloadProgress) => status(progressLine(choice.label, progress)),
       onProcessing: () => status(opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'),
     }
-    const base = {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name}
+    const base = {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name, extra: opts.ytdlpArgs}
     let filepath: string
     try {
       filepath = await download({...base, infoJsonPath}, handlers, controller.signal)

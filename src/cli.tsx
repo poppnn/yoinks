@@ -22,7 +22,7 @@ const HELP = `
   yoinks — yoink any video. paste. yoink. done.
 
   Usage
-    $ yoinks [url]
+    $ yoinks [url] [-- yt-dlp options]
 
   Examples
     $ yoinks https://youtu.be/dQw4w9WgXcQ
@@ -30,6 +30,7 @@ const HELP = `
     $ yoinks --cookies ~/cookies.txt https://youtu.be/<age-restricted>
     $ yoinks https://x.com/user/status/123456
     $ yoinks                 (prompts for a url)
+    $ yoinks <url> -- --proxy socks5://127.0.0.1:9050   (anything yt-dlp takes)
     $ f=$(yoinks --mp3 https://youtu.be/dQw4w9WgXcQ)   (scripts: path on stdout)
 
   Options
@@ -133,7 +134,7 @@ if (args.pick || !process.stdout.isTTY) {
     process.exit(1)
   }
   const pick = args.pick ?? config.format ?? 'best'
-  const code = await runHeadless({url: args.initialUrl, pick, outDir, cookies, name: args.name})
+  const code = await runHeadless({url: args.initialUrl, pick, outDir, cookies, name: args.name, ytdlpArgs: args.ytdlpArgs})
   process.exit(code)
 }
 
@@ -211,6 +212,7 @@ const {waitUntilExit} = render(
     cookies={cookies}
     defaultFormat={config.format}
     display={display}
+    ytdlpArgs={args.ytdlpArgs}
     name={args.name}
     onOutcome={result => (outcome = result)}
   />,

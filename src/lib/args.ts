@@ -1,5 +1,6 @@
 import {isThemeMode, type ThemeMode} from '../theme.js'
 import {checkBrowserSpec, type Cookies} from './cookies.js'
+import {checkYtDlpArgs} from './passthrough.js'
 import {validateSaveAs} from './save-as.js'
 
 /** what to download when skipping the picker */
@@ -21,6 +22,8 @@ export type CliArgs = {
   pick?: Pick
   /** file name for the download, extension added by the format */
   name?: string
+  /** everything after --, passed to yt-dlp as is */
+  ytdlpArgs?: string[]
   /** sign in with these cookies — never on by default */
   cookies?: Cookies
   error?: string
@@ -32,7 +35,13 @@ export function parseArgs(args: string[]): CliArgs {
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!
-    if (arg === '-h' || arg === '--help') {
+    if (arg === '--') {
+      const rest = args.slice(index + 1)
+      const refused = checkYtDlpArgs(rest)
+      if (refused) return {...result, error: refused}
+      result.ytdlpArgs = rest
+      break
+    } else if (arg === '-h' || arg === '--help') {
       result.help = true
     } else if (arg === '-v' || arg === '--version') {
       result.version = true
@@ -87,7 +96,8 @@ export function parseArgs(args: string[]): CliArgs {
     }
   }
 
-  const cookieFlags = args.filter(arg => /^--cookies(-from-browser)?(=|$)/.test(arg)).length
+  const ours = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
+  const cookieFlags = ours.filter(arg => /^--cookies(-from-browser)?(=|$)/.test(arg)).length
   if (cookieFlags > 1) return {...result, error: 'use either --cookies or --cookies-from-browser, once'}
   if (positional.length > 1) return {...result, error: 'expected a single url'}
   result.initialUrl = positional[0]
