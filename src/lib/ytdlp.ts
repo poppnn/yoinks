@@ -116,10 +116,16 @@ export type ProbeResult = {
   infoJsonPath: string
 }
 
-/** `auth` is the cookie arguments, if any — see cookieArgs(). */
-export async function probe(ytdlp: string, url: string, signal?: AbortSignal, auth: string[] = []): Promise<ProbeResult> {
+/** `auth` is the cookie arguments, if any — see cookieArgs(); `extra` the user's own, after --. */
+export async function probe(
+  ytdlp: string,
+  url: string,
+  signal?: AbortSignal,
+  auth: string[] = [],
+  extra: string[] = [],
+): Promise<ProbeResult> {
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', ...auth, url], {signal})
+    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', ...auth, ...extra, url], {signal})
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
@@ -285,6 +291,8 @@ type DownloadOptions = {
   auth?: string[]
   /** file name to use instead of the title; the extension comes from the format */
   name?: string
+  /** the user's own yt-dlp options, from after -- */
+  extra?: string[]
 }
 
 export async function download(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
@@ -294,7 +302,13 @@ export async function download(opts: DownloadOptions, handlers: DownloadHandlers
   const staging = await fs.mkdtemp(path.join(opts.outDir, '.yoinks-'))
   try {
     const staged = await runYtDlp({...opts, outDir: staging}, handlers, signal)
-    return await moveToFreeName(staged, opts.outDir)
+    const saved = await moveToFreeName(staged, opts.outDir)
+    // files yt-dlp wrote alongside it — subtitles, thumbnails, a description,
+    // asked for after -- — would otherwise go with the staging folder
+    for (const entry of await fs.readdir(staging, {withFileTypes: true})) {
+      if (entry.isFile()) await moveToFreeName(path.join(staging, entry.name), opts.outDir)
+    }
+    return saved
   } finally {
     // this also removes partial files from a cancelled or failed download
     await fs.rm(staging, {recursive: true, force: true}).catch(() => {})
@@ -344,6 +358,8 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
   ]
   // on the PATH, yt-dlp finds it itself
   if (opts.ffmpeg && opts.ffmpeg !== 'ffmpeg') args.push('--ffmpeg-location', opts.ffmpeg)
+  // last, so they win over our defaults (e.g. --concurrent-fragments)
+  args.push(...(opts.extra ?? []))
 
   return new Promise((resolve, reject) => {
     const child = spawn(opts.ytdlp, args, {signal})

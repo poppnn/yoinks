@@ -267,3 +267,24 @@ test('embedding is only asked for when ffmpeg is there', {skip: process.platform
   ])
   await fs.rm(dir, {recursive: true, force: true})
 })
+
+test('files written alongside the download are kept, and options after -- come last', {skip: process.platform === 'win32'}, async () => {
+  const dir = await tempDir()
+  const outDir = path.join(dir, 'Downloads')
+  const argsFile = path.join(dir, 'args.json')
+  const ytdlp = await fakeYtDlp(
+    dir,
+    `fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args))
+fs.writeFileSync(out.replace(/mp4$/, 'description'), 'about the clip')
+fs.writeFileSync(out, 'video'); console.log(out)`,
+  )
+  const extra = ['--write-description', '--concurrent-fragments', '8']
+
+  const saved = await download({ytdlp, url: 'https://example.com/clip.mp4', choice, outDir, extra}, noop)
+
+  assert.equal(saved, path.join(outDir, 'clip.mp4'))
+  assert.deepEqual((await fs.readdir(outDir)).sort(), ['clip.description', 'clip.mp4'])
+  const args = JSON.parse(await fs.readFile(argsFile, 'utf8')) as string[]
+  assert.deepEqual(args.slice(-extra.length), extra)
+  await fs.rm(dir, {recursive: true, force: true})
+})
