@@ -203,7 +203,7 @@ test('video choices ask for H.264, then AV1, with AAC audio before anything else
 test('size estimates describe the streams that get downloaded', () => {
   const labels = buildChoices(youtubeLike).map(choice => choice.label)
   assert.deepEqual(labels, [
-    '2160p · mp4 · ~21 MB', // AV1 + AAC
+    '2160p · mp4 · AV1 · ~21 MB', // AV1 + AAC
     '1080p · mp4 · ~9.0 MB', // H.264 + AAC
     'audio only · mp3 · ~2.0 MB',
   ])
@@ -218,4 +218,12 @@ test('a video row with an unknown size shows no estimate rather than the audio s
     ],
   })
   assert.equal(p720!.label, '720p · mp4')
+})
+
+test('names the codec only on rows that may not play everywhere', () => {
+  const [p2160, p1080] = buildChoices(youtubeLike)
+  assert.match(p2160!.label, /^2160p · mp4 · AV1 · ~/)
+  assert.match(p1080!.label, /^1080p · mp4 · ~/) // H.264: no mention
+  const vp9Only: VideoInfo = {title: 'x', formats: [{format_id: '1', vcodec: 'vp09.00.40.08', acodec: 'none', height: 1440}]}
+  assert.match(buildChoices(vp9Only)[0]!.label, /^1440p · mp4 · VP9$/)
 })
