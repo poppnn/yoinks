@@ -1,5 +1,6 @@
 import {isThemeMode, type ThemeMode} from '../theme.js'
 import {checkBrowserSpec, type Cookies} from './cookies.js'
+import {validateSaveAs} from './save-as.js'
 
 export type CliArgs = {
   help: boolean
@@ -9,6 +10,8 @@ export type CliArgs = {
   initialUrl?: string
   themeMode?: ThemeMode
   outputDir?: string
+  /** file name for the download, extension added by the format */
+  name?: string
   /** sign in with these cookies — never on by default */
   cookies?: Cookies
   error?: string
@@ -43,6 +46,12 @@ export function parseArgs(args: string[]): CliArgs {
       const value = arg.slice('--output='.length)
       if (!value) return {...result, error: '--output needs a folder, e.g. --output=~/Videos'}
       result.outputDir = value
+    } else if (arg === '-n' || arg === '--name' || arg.startsWith('--name=')) {
+      const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
+      if (value === undefined || value.startsWith('-')) return {...result, error: `${arg} needs a file name`}
+      const problem = validateSaveAs(value)
+      if (problem) return {...result, error: problem}
+      result.name = value.trim()
     } else if (arg === '--cookies-from-browser' || arg.startsWith('--cookies-from-browser=')) {
       const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index]
       if (!value || value.startsWith('-')) return {...result, error: '--cookies-from-browser needs a browser, e.g. firefox'}

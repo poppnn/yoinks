@@ -42,6 +42,14 @@ test('parses cookie options, and only one of them', () => {
   assert.match(parseArgs(['--cookies', 'a.txt', '--cookies-from-browser', 'firefox']).error ?? '', /either --cookies or --cookies-from-browser/)
 })
 
+test('parses --name, keeping the name a plain file name', () => {
+  assert.equal(parseArgs(['-n', 'my clip', 'https://x.com/v']).name, 'my clip')
+  assert.equal(parseArgs(['--name=song.mp3']).name, 'song.mp3')
+  assert.match(parseArgs(['--name']).error ?? '', /needs a file name/)
+  assert.match(parseArgs(['--name', '../escape']).error ?? '', /cannot contain/)
+  assert.match(parseArgs(['--name', 'NUL']).error ?? '', /reserved/)
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)
