@@ -25,9 +25,18 @@ export function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
+/**
+ * A path that fits in `max` columns. The end is what tells you what you
+ * got — the file, or a playlist's folder — so the middle gives way first.
+ */
 export function shortenPath(filepath: string, homedir: string, max = 60): string {
   const pretty = filepath.startsWith(homedir) ? `~${filepath.slice(homedir.length)}` : filepath
   if (pretty.length <= max) return pretty
+  const cut = Math.max(pretty.lastIndexOf('/'), pretty.lastIndexOf('\\'))
+  const last = pretty.slice(cut + 1)
+  const head = max - last.length - 2 // room for "…" and the separator
+  if (cut > 0 && head >= 6) return `${pretty.slice(0, head)}…${pretty.slice(cut)}`
+  // the last part alone is too long: keep its extension
   const ext = /\.\w{1,5}$/.exec(pretty)?.[0] ?? ''
   return `${pretty.slice(0, max - ext.length - 1)}…${ext}`
 }

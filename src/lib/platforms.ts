@@ -23,6 +23,9 @@ export function detectPlatform(url: string): Platform {
     return {key: 'unknown', label: 'Unknown site'}
   }
 
+  // e.g. yt-dlp's "ytsearch3:…" inputs have no host to show
+  if (!hostname) return {key: 'unknown', label: 'Unknown site'}
+
   for (const {hosts, platform} of PLATFORMS) {
     if (hosts.some(h => hostname === h || hostname.endsWith(`.${h}`))) {
       return platform
