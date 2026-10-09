@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import {createRequire} from 'node:module'
 import {render} from 'ink'
-import {App, type Outcome} from './app.js'
+import {App, type Display, type Outcome} from './app.js'
 import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
 import {readClipboard} from './lib/clipboard.js'
@@ -43,6 +43,10 @@ const HELP = `
                         edge, safari, brave… (Chromium browsers often
                         can't be read on Windows — use --cookies there)
     --theme <mode>      use auto, light, or dark for this run
+    --plain             no full screen, mouse or animation: output stays
+                        in the scrollback, for screen readers
+    --no-mouse          keep the terminal's own text selection
+    --no-motion         don't animate the logo
     --update            update yoinks' own copy of yt-dlp now
     -h, --help          show this help
     -v, --version       show version
@@ -138,6 +142,17 @@ const initialThemeMode = args.themeMode ?? config.theme ?? 'auto'
 
 const isTTY = Boolean(process.stdout.isTTY)
 
+// a dumb terminal can't take the alternate screen or cursor games either
+const dumb = process.env.TERM === 'dumb'
+const plain = Boolean(args.plain || config.plain || dumb)
+const display: Display = {
+  plain,
+  // --plain implies the other two: a screen reader follows the scrollback,
+  // which mouse reports and a redrawn animation both disturb
+  mouse: !plain && !args.noMouse && config.mouse !== false,
+  motion: !plain && !args.noMotion && config.motion !== false,
+}
+
 // no url given — offer the clipboard url (⇥ to paste) when it already holds one
 let clipboardUrl: string | undefined
 if (!initialUrl && isTTY) {
@@ -158,9 +173,22 @@ const leaveAltScreen = () => {
   process.stdout.write('\x1b[?1006l\x1b[?1000l\x1b[?1049l')
 }
 
-if (isTTY) {
+if (isTTY && !display.plain) {
   enterAltScreen()
   process.on('exit', leaveAltScreen)
+  // a kill or a closed terminal skips 'exit' handlers by default: restore
+  // the screen first, or the shell is left in the alternate screen with
+  // mouse reports typed into it
+  for (const [signal, code] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+    ['SIGHUP', 129],
+  ] as const) {
+    process.on(signal, () => {
+      leaveAltScreen()
+      process.exit(code)
+    })
+  }
   // restore the terminal BEFORE a crash prints, or the stack trace is
   // wiped along with the alternate screen and the app looks like it
   // silently quit
@@ -182,6 +210,7 @@ const {waitUntilExit} = render(
     outDir={outDir}
     cookies={cookies}
     defaultFormat={config.format}
+    display={display}
     name={args.name}
     onOutcome={result => (outcome = result)}
   />,

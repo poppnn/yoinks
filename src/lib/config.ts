@@ -15,9 +15,15 @@ export type Config = {
   theme?: ThemeMode
   /** the choice highlighted in the picker, and used when it is skipped */
   format?: Pick
+  /** same as --plain */
+  plain?: boolean
+  /** false: same as --no-mouse */
+  mouse?: boolean
+  /** false: same as --no-motion */
+  motion?: boolean
 }
 
-const KEYS = ['output', 'cookies', 'cookiesFromBrowser', 'theme', 'format']
+const KEYS = ['output', 'cookies', 'cookiesFromBrowser', 'theme', 'format', 'plain', 'mouse', 'motion']
 
 /**
  * Parses config.json, strictly: a misspelled key that is silently ignored
@@ -43,6 +49,12 @@ export function parseConfig(text: string, file: string, homedir: string = os.hom
     const value = entries[key]
     if (value === undefined) return undefined
     if (typeof value !== 'string' || !value.trim()) throw problem(`“${key}” must be a non-empty string`)
+    return value
+  }
+  const booleanAt = (key: string): boolean | undefined => {
+    const value = entries[key]
+    if (value === undefined) return undefined
+    if (typeof value !== 'boolean') throw problem(`“${key}” must be true or false`)
     return value
   }
   const toPath = (value: string) =>
@@ -75,6 +87,11 @@ export function parseConfig(text: string, file: string, homedir: string = os.hom
   if (format) {
     if (format !== 'best' && format !== 'mp3') throw problem(`unknown format “${format}” — use best or mp3`)
     config.format = format
+  }
+
+  for (const key of ['plain', 'mouse', 'motion'] as const) {
+    const value = booleanAt(key)
+    if (value !== undefined) config[key] = value
   }
 
   return config

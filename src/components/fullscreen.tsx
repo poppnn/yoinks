@@ -2,7 +2,8 @@ import React, {useEffect, useState, type ReactNode} from 'react'
 import {Box, useStdout} from 'ink'
 import {useTheme} from '../theme.js'
 
-export function FullScreen({children}: {children: ReactNode}) {
+/** `plain`: lay out at natural height, for output that stays in the scrollback. */
+export function FullScreen({children, plain = false}: {children: ReactNode; plain?: boolean}) {
   const theme = useTheme()
   const {stdout} = useStdout()
   const dimensions = () => ({
@@ -19,6 +20,14 @@ export function FullScreen({children}: {children: ReactNode}) {
       stdout.off('resize', onResize)
     }
   }, [stdout])
+
+  if (plain) {
+    return (
+      <Box flexDirection="column" alignItems="center" width={size.columns}>
+        {children}
+      </Box>
+    )
+  }
 
   return (
     <Box
