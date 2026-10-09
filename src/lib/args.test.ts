@@ -57,6 +57,14 @@ test('parses --best and --mp3, but not both', () => {
   assert.match(parseArgs(['--best', '--mp3']).error ?? '', /either --best or --mp3/)
 })
 
+test('parses the display options', () => {
+  assert.deepEqual(
+    (({plain, noMouse, noMotion}) => ({plain, noMouse, noMotion}))(parseArgs(['--plain', '--no-mouse', '--no-motion'])),
+    {plain: true, noMouse: true, noMotion: true},
+  )
+  assert.equal(parseArgs([]).plain, undefined)
+})
+
 test('rejects missing, invalid, and unknown options', () => {
   assert.match(parseArgs(['--theme']).error ?? '', /needs a value/)
   assert.match(parseArgs(['--theme', 'sepia']).error ?? '', /unknown theme/)

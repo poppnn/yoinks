@@ -13,6 +13,10 @@ export type CliArgs = {
   initialUrl?: string
   themeMode?: ThemeMode
   outputDir?: string
+  /** no alternate screen, mouse or animation: output stays in the scrollback */
+  plain?: boolean
+  noMouse?: boolean
+  noMotion?: boolean
   /** skip the picker and download this, without the interface */
   pick?: Pick
   /** file name for the download, extension added by the format */
@@ -34,6 +38,12 @@ export function parseArgs(args: string[]): CliArgs {
       result.version = true
     } else if (arg === '--update') {
       result.update = true
+    } else if (arg === '--plain') {
+      result.plain = true
+    } else if (arg === '--no-mouse') {
+      result.noMouse = true
+    } else if (arg === '--no-motion') {
+      result.noMotion = true
     } else if (arg === '--best' || arg === '--mp3') {
       if (result.pick && result.pick !== arg.slice(2)) return {...result, error: 'use either --best or --mp3'}
       result.pick = arg === '--best' ? 'best' : 'mp3'

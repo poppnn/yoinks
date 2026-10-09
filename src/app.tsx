@@ -88,6 +88,9 @@ function indeterminateMeta(progress: DownloadProgress): string {
 
 export type Outcome = {filepath?: string}
 
+/** How to draw: see --plain, --no-mouse and --no-motion. */
+export type Display = {plain: boolean; mouse: boolean; motion: boolean}
+
 type Phase =
   | {name: 'input'; warning?: string}
   | {name: 'probing'; status: string}
@@ -141,6 +144,7 @@ type AppProps = {
   name?: string
   /** choice to highlight in the picker */
   defaultFormat?: Pick
+  display?: Display
   onOutcome: (outcome: Outcome) => void
 }
 
@@ -164,6 +168,7 @@ function AppContent({
   cookies,
   name,
   defaultFormat,
+  display = {plain: false, mouse: true, motion: true},
   onOutcome,
   cycleTheme,
 }: {
@@ -174,6 +179,7 @@ function AppContent({
   cookies?: Cookies
   name?: string
   defaultFormat?: Pick
+  display?: Display
   cycleTheme: () => void
 }) {
   const theme = useTheme()
@@ -408,12 +414,12 @@ function AppContent({
       }
       clickTargetAt(x, y, clickTargets)?.action()
     },
-    Boolean(process.stdin.isTTY),
+    display.mouse && Boolean(process.stdin.isTTY),
   )
 
   return (
-    <FullScreen>
-      <Logo />
+    <FullScreen plain={display.plain}>
+      <Logo motion={display.motion} />
       <Gap />
       <Text color={theme.primary}>{TAGLINE}</Text>
       <Text color={theme.gray} dimColor={theme.dimSecondary}>youtube · x · instagram · threads · tiktok · +1800 more</Text>

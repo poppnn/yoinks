@@ -26,6 +26,11 @@ test('resolves relative paths from the config file, not the working directory', 
   })
 })
 
+test('reads the display settings, as booleans only', () => {
+  assert.deepEqual(parse({plain: true, mouse: false, motion: false}), {plain: true, mouse: false, motion: false})
+  assert.throws(() => parse({mouse: 'no'}), /“mouse” must be true or false/)
+})
+
 test('rejects typos and wrong values, naming the file', () => {
   assert.throws(() => parse({outpt: '~/Videos'}), /config\.json: unknown setting “outpt”/)
   assert.throws(() => parse({theme: 'sepia'}), /unknown theme “sepia”/)
