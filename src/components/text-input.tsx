@@ -1,5 +1,6 @@
 import React, {useRef, useState} from 'react'
 import {Text, useInput} from 'ink'
+import {readClipboard} from '../lib/clipboard.js'
 import {stripMouseReports} from '../lib/use-mouse-click.js'
 import {useTheme} from '../theme.js'
 
@@ -36,7 +37,7 @@ const wordRight = (text: string, from: number) => {
  * Single-line editor with readline-style keys ink-text-input lacks:
  * word jumps (⌥←/→, ⌥b/f), word delete (⌥⌫, ^w), kill line (^u/^k),
  * home/end (^a/^e), shift+arrow selection, ↑/↓ history recall,
- * paste auto-submit, and horizontal scrolling.
+ * ^v paste, paste auto-submit, and horizontal scrolling.
  */
 export function TextInput({
   value,
@@ -84,6 +85,20 @@ export function TextInput({
   }
 
   const removeRange = (start: number, end: number) => edit(value.slice(0, start) + value.slice(end), start)
+
+  // typed or pasted text — drop leaked mouse reports (a click elsewhere on
+  // the screen otherwise pastes `[<0;34;12M`), control chars and newlines,
+  // then replace the selection
+  const insert = (text: string) => {
+    // eslint-disable-next-line no-control-regex
+    const clean = stripMouseReports(text).replace(/[\x00-\x1f\x7f]/g, '')
+    if (!clean) return
+    const [start, end] = selection ?? [cursor, cursor]
+    const next = value.slice(0, start) + clean + value.slice(end)
+    edit(next, start + clean.length)
+    // a multi-char chunk is a paste — submit right away when it completes the field
+    if (clean.length > 1 && value === '' && submitOnPaste?.(next.trim())) onSubmit?.(next)
+  }
 
   useInput((input, key) => {
     if (key.return) {
@@ -138,6 +153,10 @@ export function TextInput({
     }
 
     if (key.ctrl) {
+      // terminals that don't paste on ^v themselves (most on Linux, the legacy
+      // Windows console) send it as a key. Read synchronously: an async read
+      // could land after more typing and splice into a stale value.
+      if (input === 'v') return insert(readClipboard().trim())
       if (input === 'a') return place(0)
       if (input === 'e') return place(value.length)
       if (input === 'u') return removeRange(0, selection ? selection[1] : cursor)
@@ -154,18 +173,7 @@ export function TextInput({
       return
     }
 
-    if (!input) return
-    // typed or pasted text — drop leaked mouse reports (a click elsewhere on
-    // the screen otherwise pastes `[<0;34;12M`), control chars and newlines,
-    // then replace the selection
-    // eslint-disable-next-line no-control-regex
-    const clean = stripMouseReports(input).replace(/[\x00-\x1f\x7f]/g, '')
-    if (!clean) return
-    const [start, end] = selection ?? [cursor, cursor]
-    const next = value.slice(0, start) + clean + value.slice(end)
-    edit(next, start + clean.length)
-    // a multi-char chunk is a paste — submit right away when it completes the field
-    if (clean.length > 1 && value === '' && submitOnPaste?.(next.trim())) onSubmit?.(next)
+    if (input) insert(input)
   })
 
   // scroll the window so the cursor stays visible (it can sit one past the end)
