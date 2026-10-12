@@ -1,5 +1,7 @@
 # Contributing to yoinks
 
+**English** · [Français](CONTRIBUTING.fr.md)
+
 Thanks for helping. yoinks aims to stay small: **paste. yoink. done.**
 Before starting on a feature, check [ROADMAP.md](ROADMAP.md) or open an
 issue so we can agree on the approach first.
@@ -58,8 +60,10 @@ extraction fails — including public videos — so it must stay opt-in.
 
 Include:
 
-- the output of `yoinks --version` and `yt-dlp --version`;
+- the output of `yoinks --version`, and of `yoinks --update` (it names the
+  yt-dlp version yoinks uses);
 - your OS and terminal;
 - the url (if it is public) and the exact error message.
 
-Many download failures come from an outdated yt-dlp; update it first.
+Many download failures come from an outdated yt-dlp: `yoinks --update`
+first.

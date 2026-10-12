@@ -1,5 +1,7 @@
 # yoinks
 
+**English** · [Français](README.fr.md)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
   <img src="assets/logo-light.svg" alt="yoinks" width="288">
@@ -17,25 +19,32 @@ no sketchy redirects.
 ## Install
 
 ```sh
-npm install -g yoinks
+npm install -g yoinks-cli
 ```
 
 Or try it without installing anything:
 
 ```sh
-npx yoinks
+npx yoinks-cli
 ```
 
-Requires Node 22+. Everything else (yt-dlp, ffmpeg) is fetched or bundled
-automatically.
+The command is `yoinks` either way. Requires Node 22+. Everything else
+(yt-dlp, ffmpeg) is fetched or bundled automatically.
+
+> **yoinks-cli** is the maintained fork of
+> [pablostanley/yoinks](https://github.com/pablostanley/yoinks), whose npm
+> package `yoinks` stopped at 0.3.1. Both install a `yoinks` command, so
+> remove the old one first: `npm uninstall -g yoinks`.
 
 ## Usage
 
 ```sh
 $ yoinks https://youtu.be/dQw4w9WgXcQ    # straight to the format picker
 $ yoinks                                 # prompts for a url
-$ yoinks --theme light                   # force the light palette
-$ yoinks -o <path> <url>                 # save to a folder of your choice
+$ yoinks <playlist url>                  # tick the items you want
+$ yoinks -o ~/Videos <url>               # save to a folder of your choice
+$ yoinks --mp3 <url>                     # no interface: for scripts
+$ yoinks --help                          # everything else
 ```
 
 yoinks takes over the terminal (full-screen, centered — and restores your
@@ -44,9 +53,15 @@ hit enter. `esc` goes back, `^c` quits. Or just use the mouse — the yoink
 button, the format list and the footer hints are all clickable, and
 clicking the logo takes you back home. Files are saved to your Downloads
 folder — the one your system uses, even if you moved it — or to any folder
-with `-o <dir>`. The file path is printed to your terminal when you're done.
+with `-o <dir>`, under the video's title or the name you give with
+`-n <name>`. The file path is printed to your terminal when you're done.
 When it's saved, `o` opens its folder and `c` copies the file itself, ready
 to paste into a chat or another folder.
+
+Videos come as H.264 with AAC audio where the site has it — that plays
+everywhere, QuickTime included. Above 1080p YouTube only has AV1 or VP9,
+and the picker says so (`2160p · mp4 · AV1`). mp3s get artist and title
+tags and the thumbnail as cover art; videos keep their chapters.
 
 The default `auto` theme uses your terminal's own foreground and background,
 so it follows light and dark terminal themes without guessing. Press `^t` or
@@ -68,6 +83,21 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 
 Each has a config setting, so you can set it once.
 
+## Playlists
+
+Paste a playlist link — a YouTube playlist, a channel's videos, an album —
+and yoinks lists its items, all ticked:
+
+- `↑`/`↓` move, `space` ticks or unticks, `a` ticks all or none, `↵` goes on
+- then pick a format: up to 1080p, 720p or 360p, or mp3
+- the items download one after the other, into a folder named after the
+  playlist (or `-n <name>`), numbered so they keep their order:
+  `03 - Title.mp3`
+
+One item failing — a private video, say — doesn't stop the others; the
+done screen lists what didn't make it. A link to a video inside a playlist
+(`watch?v=…&list=…`) is still just that video.
+
 ## Scripting
 
 `--best` (highest quality video) or `--mp3` (audio only) skip the picker
@@ -78,9 +108,18 @@ the only thing printed on stdout.
 f=$(yoinks --mp3 -n "my song" https://youtu.be/dQw4w9WgXcQ) && echo "got $f"
 ```
 
-The exit code is 0 when the file is saved, 1 on failure and 130 when you
-press ^c. When stdout isn't a terminal — a pipe, a script — yoinks runs
-this way on its own, with `--best` unless you pass `--mp3`.
+For a playlist, `--best` means up to 1080p, each saved path is printed as
+it lands, one per line, and `--items` picks entries by their number in the
+playlist:
+
+```sh
+yoinks --mp3 --items 1-3,7,10- <playlist url>
+```
+
+The exit code is 0 when everything is saved, 1 on failure (any item, for
+a playlist) and 130 when you press ^c. When stdout isn't a terminal — a
+pipe, a script — yoinks runs this way on its own, with `--best` unless you
+pass `--mp3`.
 
 ## Configuration
 
@@ -122,8 +161,9 @@ yoinks <url> -- --write-auto-subs --embed-subs --sub-langs en
 
 Files yt-dlp writes alongside the download (subtitles, thumbnails…) are
 kept next to it. Options that would break yoinks are refused, with what to
-use instead: output paths, the format (the picker chooses it), and
-anything that changes the output yoinks reads for progress.
+use instead: output paths, the format (the picker chooses it), playlist
+selection (use `--items`), and anything that changes the output yoinks
+reads for progress.
 
 ## Signing in
 
@@ -168,27 +208,37 @@ A cookies.txt is as good as your password: don't share it or commit it.
 - To use your own yt-dlp instead, set `YOINKS_YT_DLP` to its name or
   path. Your system yt-dlp is also used as a fallback when yoinks can't
   get its own copy, e.g. offline on first run or on Termux.
-- ffmpeg (needed for merging high-res streams and mp3 extraction) is found
-  on your PATH, with `ffmpeg-static` as a bundled fallback.
+- ffmpeg (needed for merging high-res streams, mp3 extraction and
+  embedding tags) is found on your PATH, with `ffmpeg-static` as a
+  bundled fallback.
 - The UI is [Ink](https://github.com/vadimdemedes/ink) — React for the
   terminal.
 
 ## Development
 
 ```sh
-npm install
+npm ci
 npm run build        # bundle to dist/ with tsup
 npm run dev          # rebuild on change
-node dist/cli.js <url>
+node bin/yoinks.js <url>
 npm run typecheck
+npm test
 ```
 
 To try it as a global command without publishing: `npm link`, then run
-`yoinks` anywhere.
+`yoinks` anywhere. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a
+pull request.
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md).
+See [ROADMAP.md](ROADMAP.md) and the [changelog](CHANGELOG.md).
+
+## Credits
+
+yoinks was created by [Pablo Stanley](https://github.com/pablostanley).
+This fork builds on fixes and ideas from the community's pull requests to
+the original — thank you @agammann, @g9i, @lennin331, @aliabedi1,
+@SuperProCoolName, @EmekC, @juan-multi-7575 and @Mr-Neutr0n.
 
 ## A note on fair use
 
