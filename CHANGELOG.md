@@ -6,8 +6,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-12
+
+First release as **`yoinks-cli`**, the maintained fork of
+[pablostanley/yoinks](https://github.com/pablostanley/yoinks), whose npm
+package `yoinks` stopped at 0.3.1. The command is still `yoinks`; remove the
+old package first (`npm uninstall -g yoinks`), since both install it.
+
 ### Added
 
+- **Playlists.** Paste a playlist link — a YouTube playlist, a channel's
+  videos, an album — and tick the items you want; they download one after
+  the other into a folder named after the playlist, numbered so they keep
+  their order. One failed item doesn't stop the rest. With `--best` /
+  `--mp3`, `--items 1-3,7` picks entries and each saved path is printed as
+  it lands. A link to a video inside a playlist is still just that video.
+- Documentation in French: `README.fr.md`, `CONTRIBUTING.fr.md`,
+  `ROADMAP.fr.md`.
 - **Sign in for videos that need an account** with `--cookies <file>` or
   `--cookies-from-browser <browser>`. Never on by default. If the cookies
   can't be read — common on Windows, where Chromium browsers lock them —
@@ -62,6 +77,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A playlist link no longer fails with a misleading "HTTP Error 403" and
+  advice to update yt-dlp.
 - Killing yoinks or closing its terminal no longer leaves the shell in the
   alternate screen with mouse reports typed into it.
 - The size shown for each resolution is the size of what gets downloaded,
@@ -120,7 +137,8 @@ First public release: paste a url, pick a format, get the file in
 `~/Downloads`. Animated logo, input history, clipboard url offered with ⇥,
 esc to cancel, progress bar with part labels for merged downloads.
 
-[Unreleased]: https://github.com/poppnn/yoinks/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/poppnn/yoinks/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/poppnn/yoinks/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/poppnn/yoinks/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/poppnn/yoinks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/poppnn/yoinks/compare/v0.1.1...v0.2.0
