@@ -1,6 +1,8 @@
 # yoinks — Roadmap de reprise
 
-> État au 9 octobre 2026 · base : `pablostanley/yoinks@6f03720` (v0.3.1)
+[English](ROADMAP.md) · **Français**
+
+> Diagnostic du 9 octobre 2026 sur `pablostanley/yoinks@6f03720` (v0.3.1). Mis à jour le 12 octobre 2026 : **les phases 0 à 5 sont faites**, et la v0.4.0 est prête à publier sur npm sous le nom `yoinks-cli`.
 
 ## 1. État des lieux
 
@@ -22,11 +24,11 @@ La section « Roadmap » du README d'origine est reprise ici, pour qu'il n'exist
 
 | Point du README | Statut | Où ici |
 |---|---|---|
-| Mode scriptable `--best` / `--mp3` (sans menu) | à faire | Phase 2 |
-| `-o <dir>` | à faire | Phase 2 |
-| Playlists, fils contenant plusieurs vidéos | à faire | Phase 5 |
+| Mode scriptable `--best` / `--mp3` (sans menu) | ✅ fait | Phase 2 |
+| `-o <dir>` | ✅ fait | Phase 2 |
+| Playlists, fils contenant plusieurs vidéos | ✅ fait | Phase 5 |
 | Détection du presse-papiers au lancement | **déjà fait** (`cli.tsx:56-62`, proposé avec ⇥) | — |
-| Mise à jour automatique de yt-dlp | à faire | Phase 1 (R1) |
+| Mise à jour automatique de yt-dlp | ✅ fait | Phase 1 (R1) |
 | Publication npm | fait | — |
 | Installeur `curl yoinks.sh \| sh` | à décider | §5 |
 
@@ -52,14 +54,14 @@ Effort estimé : **S** = moins d'une demi-journée · **M** = 1 à 2 jours · **
 
 ### Phase 0 — Fondations · avant toute fonctionnalité
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| Choisir le nom de publication (voir §5) et forker | S | — |
-| Ouvrir une issue amont pour proposer une co-maintenance, ou obtenir l'accord pour un fork « officiel » | S | — |
-| CI GitHub Actions : typecheck, tests, build sur ubuntu/macos/windows × Node 22/24 | S | — |
-| Corriger `engines` à `>=22` avec un garde-fou au lancement | S | PR #37 |
-| Ajouter `CHANGELOG.md` et `CONTRIBUTING.md` (une PR = un sujet) | S | — |
-| Vérifier que la suite de tests passe sur `main` (PR #17 y signale un test de thème en échec, non vérifié ici) | S | — |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| Choisir le nom de publication (voir §5) et forker | S | — | ✅ fork `poppnn/yoinks`, nom npm `yoinks-cli` |
+| Ouvrir une issue amont pour proposer une co-maintenance, ou obtenir l'accord pour un fork « officiel » | S | — | ✅ pablostanley/yoinks#41, sans réponse au 12/10 |
+| CI GitHub Actions : typecheck, tests, build sur ubuntu/macos/windows × Node 22/24 | S | — | ✅ |
+| Corriger `engines` à `>=22` avec un garde-fou au lancement | S | PR #37 | ✅ |
+| Ajouter `CHANGELOG.md` et `CONTRIBUTING.md` (une PR = un sujet) | S | — | ✅ |
+| Vérifier que la suite de tests passe sur `main` (PR #17 y signale un test de thème en échec, non vérifié ici) | S | — | ✅ elle passait : le test cité n'échouait pas |
 
 ### Phase 1 — Fiabilité · v0.4 « ça marche »
 
@@ -145,9 +147,22 @@ Ce que la réalisation a changé par rapport au plan :
 
 ### Phase 5 — Playlists · v0.8
 
-| Tâche | Effort | Réf. |
-|---|---|---|
-| Playlists et fils contenant plusieurs vidéos : sélection des éléments, progression globale. Il faut retirer `--no-playlist` et revoir l'analyse de la progression, qui suppose aujourd'hui un seul élément. | L | README d'origine |
+| Tâche | Effort | Réf. | État |
+|---|---|---|---|
+| Playlists et fils contenant plusieurs vidéos : sélection des éléments, progression globale | L | README d'origine | ✅ |
+
+Ce que la réalisation a changé par rapport au plan :
+
+- **`--no-playlist` est resté.** Avec `--flat-playlist` en plus, une vraie playlist est listée en 2 à 3 secondes sans analyser chaque élément, tandis qu'un lien de vidéo situé dans une playlist (`watch?v=…&list=…`) reste une seule vidéo, ce qu'on veut presque toujours.
+- **La progression n'a pas eu à changer.** Les éléments se téléchargent un par un, avec `--yes-playlist -I <n>` sur l'URL de la playlist. Chaque élément réutilise donc tout le parcours d'une vidéo seule (dossier temporaire, nom libre, progression, tags), et « 2/5 » s'affiche au-dessus.
+- **L'URL de la playlist plutôt que celle de chaque élément**, parce que certains extracteurs (X avec plusieurs vidéos) n'ont pas d'URL individuelle fiable.
+- **Un élément en échec n'arrête pas les autres.** L'écran final et le code de sortie le signalent.
+- **Un bug préexistant corrigé au passage** : un lien de playlist donnait une fausse erreur 403, suivie du conseil « yt-dlp est périmé », lui aussi faux.
+- **Vérifié avec de vraies touches** envoyées à l'interface dans un faux terminal : en décochant l'élément 2 d'une playlist de 3, seuls `01` et `03` ont été enregistrés.
+
+### Publication · v0.4.0
+
+Les cinq phases sont sorties ensemble en **v0.4.0**, plutôt qu'en v0.4 à v0.8 comme prévu : rien n'avait été publié entre-temps, et une seule version annonce plus clairement le changement de nom.
 
 ### Plus tard, ou pas
 
@@ -155,7 +170,7 @@ Ce que la réalisation a changé par rapport au plan :
 |---|---|---|
 | Réécriture en Rust (#38) | **Non** | Aucun gain utilisateur, et tout le travail des PR serait perdu |
 | Docker (#10) | **Non** | Une interface de terminal dans un conteneur n'a guère de sens ; utiliser yt-dlp directement |
-| Termux / Android (#39) | **Documenter** | Fonctionne si `pkg install yt-dlp ffmpeg nodejs`, puisque le yt-dlp système est essayé en premier. Ajouter un garde-fou : `process.platform === 'android'` télécharge aujourd'hui un binaire Linux glibc qui ne peut pas tourner. |
+| Termux / Android (#39) | **Documenter** | Fonctionne si `pkg install yt-dlp ffmpeg nodejs` : sans binaire autonome pour Android, yoinks se rabat sur le yt-dlp système. Le garde-fou est fait (phase 1) : yoinks ne télécharge plus un binaire Linux glibc qui ne peut pas y tourner. |
 | Multilingue (#16, PR #16) | **Reporté** | Coût d'architecture élevé tant que l'interface bouge encore |
 | Scripts d'installation (PR #9) | **À décider** (§5) | Prévu par l'auteur d'origine. Reste à trancher : publier un `curl \| sh` impose de signer et de vérifier ce qu'il télécharge. |
 | #24, #26, #36 | **Demander des détails** | Trop peu d'informations ; #24 relève probablement de R1 |
@@ -166,28 +181,23 @@ Chaque PR se fusionne seule sans conflit avec `main`, mais **elles se chevauchen
 
 | Ordre | PR | Décision | Raison |
 |---|---|---|---|
-| 1 | #37 garde-fou Node | **Fusionner** | Corrige R3, petite, isolée |
+| 1 | #37 garde-fou Node | **Reprise** (phase 0) | Corrige R3, petite, isolée |
 | 2 | #40 mauvais fichier, blocage, QuickTime | **Reprise en entier** (6 commits en phase 1, 2 en phase 3) | La PR contient 8 commits, pas 3. |
 | 3 | #18 nettoyage à l'annulation | **Rendue inutile** | Le dossier isolé de #40 supprime tous les fichiers partiels et reprend l'attente de fin de yt-dlp que #18 avait identifiée. Créditée dans le CHANGELOG. |
-| 4 | #35 option `-o` | **Fusionner, puis adapter** | Rebrancher sur la config et le Known Folder (phase 2) |
-| 5 | #7 nom de fichier | **Fusionner après #40** | Touche aussi le chemin de sortie |
+| 4 | #35 option `-o` | **Reprise, puis adaptée** (phase 2) | Rebranchée sur la config et le dossier Téléchargements réel ; son test rendu portable sous Windows |
+| 5 | #7 nom de fichier | **Reprise en partie** (phase 2) | La validation, sous l'option `-n, --name` ; pas la touche `s` du sélecteur |
 | 6 | #33 QuickTime H.264/AAC | **Non reprise** (phase 3) | Elle ajoutait une ligne « QuickTime » à côté de lignes restées en AV1/Opus. #40 rend le choix par défaut compatible pour tout le monde, et son suffixe `.quicktime.mp4` contournait un bug déjà corrigé. |
 | 7 | #2 copier dans le presse-papiers | **Reprise en partie** (phase 4) | La copie, pas la bascule `^d` ni le fichier `settings.json` |
-| — | #23 QoL | **Reprendre en partie** | Garder `--concurrent-fragments`, le nettoyage des fichiers temporaires et la touche `o`. **Refuser** `--cookies-from-browser firefox` codé en dur : fatal pour quiconque n'a pas Firefox. |
+| — | #23 QoL | **Reprise en partie** (phase 2) | `--concurrent-fragments` et la touche `o` ; le nettoyage des fichiers temporaires était déjà fait via #40. **Refusé** : `--cookies-from-browser firefox` codé en dur, fatal pour quiconque n'a pas Firefox. |
 | — | #31 accessibilité | **Découpée et reprise en partie** (phase 4) | Voir la phase 4 pour ce qui a été écarté et pourquoi |
 | — | #17 repli mweb sur 403 | **En attente** | Fixer un `player_client` vieillit mal ; réévaluer une fois R1 corrigé, car un yt-dlp à jour rend souvent ce contournement inutile |
 | — | #4 chapitres | **Rendue inutile** (phase 3) | Les chapitres arrivent avec `--embed-metadata` |
 | — | #16 multilingue | **Reporter** | Voir plus haut |
 | — | #9 scripts d'installation | **En attente** | Dépend de la décision du §5 |
 
-## 5. Décisions à prendre
+## 5. Décisions
 
-1. **Le nom npm.** `yoinks` appartient à `pablostanley`, donc un fork ne peut pas publier sous ce nom. Trois options :
-   - (a) obtenir les droits de publication auprès de Pablo — idéal, puisque les 5 577 étoiles et les installations existantes suivraient ;
-   - (b) un nom scopé, comme `@poppnn/yoinks` ;
-   - (c) un nouveau nom.
-
-   Tenter (a) d'abord, avec (b) comme repli.
+1. **Le nom npm — tranché : `yoinks-cli`.** `yoinks` appartient à `pablostanley`, et l'issue #41 qui lui proposait la co-maintenance est restée sans réponse. Plutôt que le nom scopé `@poppnn/yoinks` envisagé au départ, un nom sans scope a été retenu : il est indépendant de l'identifiant npm de la personne qui publie, et se lit plus facilement. La commande installée reste `yoinks`. Si Pablo cède un jour le nom `yoinks`, il suffira d'y publier et de marquer `yoinks-cli` comme obsolète avec `npm deprecate`.
 2. **Le fork reste-t-il compatible avec l'amont ?** Si Pablo revient, il faut pouvoir lui reverser les correctifs. Pour cela : des PR petites et un historique propre.
 3. **L'installeur `curl | sh`.** L'auteur d'origine le voulait. Il faciliterait l'installation pour les gens qui n'ont pas Node, mais il ajoute une surface de sécurité (script servi depuis un domaine, binaire à vérifier). Une alternative sans script : des binaires autonomes via `node --experimental-sea` ou bun, publiés en release GitHub avec leurs sommes de contrôle.
 4. **Le périmètre.** yoinks doit rester « coller, récupérer, terminé ». Chaque option ajoutée doit avoir une valeur par défaut raisonnable : l'interface ne doit pas devenir un front-end exhaustif de yt-dlp.
