@@ -1,6 +1,6 @@
 {
-  "name": "yoinks",
-  "version": "0.3.1",
+  "name": "yoinks-cli",
+  "version": "0.4.0",
   "description": "yoink any video from YouTube, X, Instagram, Threads & 1800+ sites — right from your terminal. paste. yoink. done.",
   "type": "module",
   "bin": {
@@ -22,6 +22,9 @@
     "prepublishOnly": "npm test && npm run typecheck && npm run build"
   },
   "author": "Pablo Stanley",
+  "contributors": [
+    "poppnn (https://github.com/poppnn)"
+  ],
   "keywords": [
     "video",
     "downloader",
@@ -51,10 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pablostanley/yoinks.git"
+    "url": "git+https://github.com/poppnn/yoinks.git"
   },
-  "homepage": "https://github.com/pablostanley/yoinks#readme",
+  "homepage": "https://github.com/poppnn/yoinks#readme",
   "bugs": {
-    "url": "https://github.com/pablostanley/yoinks/issues"
+    "url": "https://github.com/poppnn/yoinks/issues"
   }
 }
