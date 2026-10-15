@@ -31,9 +31,9 @@ export function readClipboard(): string {
  * a synchronous call would freeze the interface meanwhile.
  */
 export async function copyFileToClipboard(filepath: string): Promise<boolean> {
-  const run = (command: string, args: string[], input?: string) =>
+  const run = (command: string, args: string[], input?: string, env?: NodeJS.ProcessEnv) =>
     new Promise<boolean>(resolve => {
-      const child = execFile(command, args, {timeout: 5_000, windowsHide: true}, error => resolve(!error))
+      const child = execFile(command, args, {timeout: 5_000, windowsHide: true, env}, error => resolve(!error))
       child.stdin?.end(input)
     })
 
@@ -42,10 +42,13 @@ export async function copyFileToClipboard(filepath: string): Promise<boolean> {
     return run('osascript', ['-e', `set the clipboard to (POSIX file ${JSON.stringify(filepath)})`])
   }
   if (process.platform === 'win32') {
-    // -LiteralPath so wildcard-looking names aren't expanded; doubled single
-    // quotes are PowerShell's escape inside a literal string
-    const literal = `'${filepath.replace(/'/g, "''")}'`
-    return run('powershell', ['-NoProfile', '-NonInteractive', '-Command', `Set-Clipboard -LiteralPath ${literal}`])
+    // the path goes in through the environment, never into the command: a
+    // video title is chosen by its uploader, and PowerShell also ends a quoted
+    // string at ’ — escaping ' alone let a title run commands
+    return run('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Set-Clipboard -LiteralPath $env:YOINKS_FILE'], undefined, {
+      ...process.env,
+      YOINKS_FILE: filepath,
+    })
   }
   // encoded: a raw "file://" + path breaks on spaces
   const uri = `${pathToFileURL(filepath).href}\r\n`
