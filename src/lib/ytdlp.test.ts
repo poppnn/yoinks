@@ -3,13 +3,19 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import {buildChoices, describeYtDlpError, download, probeWithCookies, type DownloadChoice, type VideoInfo} from './ytdlp.js'
+import {buildChoices, describeYtDlpError, download, downloadPlaylist, probeWithCookies, type DownloadChoice, type VideoInfo} from './ytdlp.js'
 import {managedPath} from './ytdlp-install.js'
 
 const choice: DownloadChoice = {label: 'best', kind: 'video', args: []}
 const noop = {onProgress: () => {}, onProcessing: () => {}}
 
-/** A fake yt-dlp that saves to "clip.mp4" and then runs `body`. */
+/**
+ * A fake yt-dlp that saves to "clip.mp4" and then runs `body`. Windows can't
+ * run a script as a program, so there node itself stands in for yt-dlp and
+ * loads the fake with --require. The fake must then exit before node goes on
+ * to run the url as a script: hence the final exit, and synchronous writes
+ * (`say`) that an exit can't cut short.
+ */
 async function fakeYtDlp(dir: string, body: string): Promise<string> {
   const bin = path.join(dir, 'fake-yt-dlp')
   await fs.writeFile(
@@ -17,22 +23,27 @@ async function fakeYtDlp(dir: string, body: string): Promise<string> {
     `#!/usr/bin/env node
 const fs = require('node:fs')
 const args = process.argv.slice(2)
+const say = text => fs.writeSync(1, text + '\\n')
 const out = args[args.indexOf('-o') + 1].replace('%(title).60s', 'clip').replace('%(ext)s', 'mp4')
 ${body}
+process.exit()
 `,
     {mode: 0o755},
   )
-  return bin
+  if (process.platform !== 'win32') return bin
+  // NODE_OPTIONS reads \ as an escape: hand it the path with forward slashes
+  process.env.NODE_OPTIONS = `--require "${bin.replaceAll('\\', '/')}"`
+  return process.execPath
 }
 
 const tempDir = () => fs.mkdtemp(path.join(os.tmpdir(), 'yoinks-test-'))
 
-test('a same-named file in the output folder is kept and the new download gets a free name', {skip: process.platform === 'win32'}, async () => {
+test('a same-named file in the output folder is kept and the new download gets a free name', async () => {
   const dir = await tempDir()
   const outDir = path.join(dir, 'Downloads')
   await fs.mkdir(outDir)
   await fs.writeFile(path.join(outDir, 'clip.mp4'), 'an earlier, different video')
-  const ytdlp = await fakeYtDlp(dir, `fs.writeFileSync(out, 'the video you just picked'); console.log(out)`)
+  const ytdlp = await fakeYtDlp(dir, `fs.writeFileSync(out, 'the video you just picked'); say(out)`)
 
   const filepath = await download({ytdlp, url: 'https://example.com/clip.mp4', choice, outDir}, noop)
 
@@ -43,7 +54,7 @@ test('a same-named file in the output folder is kept and the new download gets a
   await fs.rm(dir, {recursive: true, force: true})
 })
 
-test('cancelling stops right away and leaves no partial files', {skip: process.platform === 'win32', timeout: 3000}, async () => {
+test('cancelling stops right away and leaves no partial files', {timeout: 3000}, async () => {
   const dir = await tempDir()
   const outDir = path.join(dir, 'Downloads')
   const pidFile = path.join(dir, 'helper.pid')
@@ -51,10 +62,10 @@ test('cancelling stops right away and leaves no partial files', {skip: process.p
   const ytdlp = await fakeYtDlp(
     dir,
     `fs.writeFileSync(out + '.part', 'half a video')
-const helper = require('node:child_process').spawn('sleep', ['10'], {stdio: 'inherit'})
+const helper = require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], {stdio: 'inherit', env: {...process.env, NODE_OPTIONS: ''}})
 fs.writeFileSync(${JSON.stringify(pidFile)}, String(helper.pid))
-console.log('YOINK|6|12|NA|NA|NA')
-setInterval(() => {}, 1000)`,
+say('YOINK|6|12|NA|NA|NA')
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10000)`,
   )
   const controller = new AbortController()
 
@@ -68,7 +79,10 @@ setInterval(() => {}, 1000)`,
   )
 
   assert.deepEqual(await fs.readdir(outDir), [])
-  process.kill(Number(await fs.readFile(pidFile, 'utf8')))
+  // cleanup only — on Windows the helper already went down with the killed fake
+  try {
+    process.kill(Number(await fs.readFile(pidFile, 'utf8')))
+  } catch {}
   await fs.rm(dir, {recursive: true, force: true})
 })
 
@@ -238,13 +252,13 @@ test('mp3s get tags and cover art, videos get tags and chapters', () => {
   for (const video of choices.filter(c => c.kind === 'video')) assert.deepEqual(video.embed, ['--embed-metadata'])
 })
 
-test('embedding is only asked for when ffmpeg is there', {skip: process.platform === 'win32'}, async () => {
+test('embedding is only asked for when ffmpeg is there', async () => {
   const dir = await tempDir()
   const outDir = path.join(dir, 'Downloads')
   const argsFile = path.join(dir, 'args.json')
   const ytdlp = await fakeYtDlp(
     dir,
-    `fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args)); fs.writeFileSync(out, 'x'); console.log(out)`,
+    `fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args)); fs.writeFileSync(out, 'x'); say(out)`,
   )
   const withEmbed = {...choice, embed: ['--embed-metadata']}
   const ran = async (ffmpeg?: string) => {
@@ -270,7 +284,7 @@ test('embedding is only asked for when ffmpeg is there', {skip: process.platform
   await fs.rm(dir, {recursive: true, force: true})
 })
 
-test('files written alongside the download are kept, and options after -- come last', {skip: process.platform === 'win32'}, async () => {
+test('files written alongside the download are kept, and options after -- come last', async () => {
   const dir = await tempDir()
   const outDir = path.join(dir, 'Downloads')
   const argsFile = path.join(dir, 'args.json')
@@ -278,7 +292,7 @@ test('files written alongside the download are kept, and options after -- come l
     dir,
     `fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args))
 fs.writeFileSync(out.replace(/mp4$/, 'description'), 'about the clip')
-fs.writeFileSync(out, 'video'); console.log(out)`,
+fs.writeFileSync(out, 'video'); say(out)`,
   )
   const extra = ['--write-description', '--concurrent-fragments', '8']
 
@@ -288,5 +302,62 @@ fs.writeFileSync(out, 'video'); console.log(out)`,
   assert.deepEqual((await fs.readdir(outDir)).sort(), ['clip.description', 'clip.mp4'])
   const args = JSON.parse(await fs.readFile(argsFile, 'utf8')) as string[]
   assert.deepEqual(args.slice(-extra.length), extra)
+  await fs.rm(dir, {recursive: true, force: true})
+})
+
+// --load-info-json comes first, and node would take it for one of its own options
+test('only expired links are retried, with fresh ones', {skip: process.platform === 'win32'}, async () => {
+  const dir = await tempDir()
+  const outDir = path.join(dir, 'Downloads')
+  const infoJsonPath = path.join(dir, 'info.json')
+  await fs.writeFile(infoJsonPath, '{}')
+  const runs = path.join(dir, 'runs')
+  // fails while reusing the probe's info with `error`, works with a fresh extraction
+  const fake = (error: string) =>
+    fakeYtDlp(
+      dir,
+      `fs.appendFileSync(${JSON.stringify(runs)}, 'x')
+if (args.includes('--load-info-json')) { fs.writeSync(2, ${JSON.stringify(error + '\n')}); process.exit(1) }
+fs.writeFileSync(out, 'video'); say(out)`,
+    )
+  let refreshed = 0
+  const handlers = {...noop, onRefresh: () => refreshed++}
+
+  const expired = await fake('ERROR: unable to download video data: HTTP Error 403: Forbidden')
+  assert.equal(await download({ytdlp: expired, url: 'https://example.com/clip.mp4', choice, outDir, infoJsonPath}, handlers), path.join(outDir, 'clip.mp4'))
+  assert.equal(refreshed, 1)
+
+  await fs.rm(runs)
+  const fullDisk = await fake('ERROR: unable to write data: [Errno 28] No space left on device')
+  await assert.rejects(download({ytdlp: fullDisk, url: 'https://example.com/clip.mp4', choice, outDir, infoJsonPath}, handlers), /No space left/)
+  assert.equal((await fs.readFile(runs, 'utf8')).length, 1) // not downloaded a second time
+  await fs.rm(dir, {recursive: true, force: true})
+})
+
+test("playlist items with their own url skip -I; the others use it", async () => {
+  const dir = await tempDir()
+  const calls = path.join(dir, 'calls')
+  const ytdlp = await fakeYtDlp(
+    dir,
+    `fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv) + '\\n')
+const n = args.includes('-I') ? args[args.indexOf('-I') + 1] : 'url'
+const file = out.replace('clip.mp4', n + '.mp4'); fs.writeFileSync(file, 'x'); say(file)`,
+  )
+  const entries = [
+    {index: 1, title: 'one', url: 'https://example.com/watch?v=one'},
+    {index: 2, title: 'two'},
+  ]
+  const {folder, results} = await downloadPlaylist(
+    {ytdlp, url: 'https://example.com/list', choice, outDir: dir, playlist: {title: 'My list', entries}, entries},
+    {...noop, onItem: () => {}},
+  )
+
+  assert.equal(folder, path.join(dir, 'My list'))
+  assert.deepEqual(results.map(r => r.error), [undefined, undefined])
+  const [byUrl, byIndex] = (await fs.readFile(calls, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as string[])
+  // on Windows node holds the url in argv[1], as a resolved path: match on a part of it
+  assert.ok(byUrl!.join(' ').includes('watch?v=one') && byUrl!.includes('--no-playlist') && !byUrl!.includes('-I'))
+  assert.ok(byIndex!.join(' ').includes('list') && !byIndex!.join(' ').includes('watch?v=one'))
+  assert.deepEqual(byIndex!.slice(byIndex!.indexOf('-I'), byIndex!.indexOf('-I') + 2), ['-I', '2'])
   await fs.rm(dir, {recursive: true, force: true})
 })

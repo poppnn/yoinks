@@ -7,7 +7,7 @@ const search = {
   _type: 'playlist',
   title: 'rick astley never gonna give you up',
   entries: [
-    {_type: 'url', ie_key: 'Youtube', id: 'dQw4w9WgXcQ', title: 'Rick Astley - Never Gonna Give You Up', duration: 214},
+    {_type: 'url', ie_key: 'Youtube', id: 'dQw4w9WgXcQ', title: 'Rick Astley - Never Gonna Give You Up', duration: 214, url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {_type: 'url', ie_key: 'Youtube', id: '7FwDP17XPlk', title: 'Never Gonna Give You Up (lyrics)'},
     {_type: 'url', ie_key: 'Youtube', id: 'LLFhKaqnWwk', title: ''},
   ],
@@ -17,7 +17,7 @@ test('reads a flat playlist, and leaves single videos alone', () => {
   assert.deepEqual(parsePlaylist(search), {
     title: 'rick astley never gonna give you up',
     entries: [
-      {index: 1, title: 'Rick Astley - Never Gonna Give You Up', duration: 214},
+      {index: 1, title: 'Rick Astley - Never Gonna Give You Up', duration: 214, url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
       {index: 2, title: 'Never Gonna Give You Up (lyrics)', duration: undefined},
       {index: 3, title: 'item 3', duration: undefined},
     ],

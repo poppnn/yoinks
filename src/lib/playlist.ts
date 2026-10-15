@@ -3,6 +3,8 @@ export type PlaylistEntry = {
   index: number
   title: string
   duration?: number
+  /** the item's own url, when yt-dlp lists one — faster to download than -I */
+  url?: string
 }
 
 export type PlaylistInfo = {
@@ -23,7 +25,8 @@ export function parsePlaylist(json: unknown): PlaylistInfo | undefined {
     if (!entry || /(Tab|Playlist)$/.test(String(entry.ie_key ?? ''))) return []
     const title = typeof entry.title === 'string' && entry.title.trim() ? entry.title : `item ${position + 1}`
     const duration = typeof entry.duration === 'number' ? entry.duration : undefined
-    return [{index: position + 1, title, duration}]
+    const url = entry._type === 'url' && typeof entry.url === 'string' ? entry.url : undefined
+    return [{index: position + 1, title, duration, ...(url && {url})}]
   })
   return {title: typeof raw.title === 'string' && raw.title.trim() ? raw.title : 'playlist', entries}
 }

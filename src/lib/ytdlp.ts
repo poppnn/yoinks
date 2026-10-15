@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {formatBytes} from './format.js'
-import {parsePlaylist, type PlaylistInfo} from './playlist.js'
+import {downloadItems, folderName, itemTemplate, parsePlaylist, type ItemResult, type PlaylistEntry, type PlaylistInfo} from './playlist.js'
 import {saveAsOutputTemplate} from './save-as.js'
 import {assetName, dueForCheck, installLatest, managedPath, markChecked} from './ytdlp-install.js'
 
@@ -306,6 +306,8 @@ export type DownloadProgress = {
 export type DownloadHandlers = {
   onProgress: (progress: DownloadProgress) => void
   onProcessing: () => void
+  /** the cached links expired: starting over with fresh ones */
+  onRefresh?: () => void
 }
 
 /**
@@ -343,6 +345,56 @@ type DownloadOptions = {
 }
 
 export async function download(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
+  try {
+    return await downloadOnce(opts, handlers, signal)
+  } catch (error) {
+    // the probe's media links expire after a few hours — the only failure a
+    // fresh extraction fixes; anything else would just download it all again
+    const expired = error instanceof YtDlpError && error.kind === 'outdated'
+    if (!opts.infoJsonPath || signal?.aborted || !expired) throw error
+    handlers.onRefresh?.()
+    return downloadOnce({...opts, infoJsonPath: undefined}, handlers, signal)
+  }
+}
+
+/**
+ * Downloads the chosen entries of a playlist one after the other, into a
+ * folder named after it (or `name`), numbered so they keep their order.
+ */
+export async function downloadPlaylist(
+  opts: Omit<DownloadOptions, 'infoJsonPath' | 'playlistItem' | 'template'> & {playlist: PlaylistInfo; entries: PlaylistEntry[]},
+  handlers: DownloadHandlers & {onItem: (position: number, entry: PlaylistEntry) => void; onSaved?: (filepath: string) => void},
+  signal?: AbortSignal,
+): Promise<{folder: string; results: ItemResult[]}> {
+  const {playlist, entries, name, ...base} = opts
+  const folder = path.join(opts.outDir, folderName(name ?? playlist.title))
+  const results = await downloadItems(
+    entries,
+    async entry => {
+      const filepath = await download(
+        {
+          ...base,
+          outDir: folder,
+          // an item's own url when there is one: -I re-reads the playlist up
+          // to that item, slower the further down it is (5.8 s for item 1,
+          // 19 s for item 1500, against 2.7 s by url)
+          url: entry.url ?? base.url,
+          playlistItem: entry.url ? undefined : entry.index,
+          template: itemTemplate(entry, playlist.entries.length),
+        },
+        handlers,
+        signal,
+      )
+      handlers.onSaved?.(filepath)
+      return filepath
+    },
+    handlers.onItem,
+    signal,
+  )
+  return {folder, results}
+}
+
+async function downloadOnce(opts: DownloadOptions, handlers: DownloadHandlers, signal?: AbortSignal): Promise<string> {
   // yt-dlp skips a file that already exists and returns the old one, so
   // download into an empty folder and pick a free name at the end
   await fs.mkdir(opts.outDir, {recursive: true})

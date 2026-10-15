@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import path from 'node:path'
 import {Box, Text, useApp, useInput, useStdout} from 'ink'
 import SelectInput, {type IndicatorProps, type ItemProps} from 'ink-select-input'
 import Spinner from 'ink-spinner'
@@ -20,13 +19,14 @@ import {formatBytes, formatDuration, formatEta, formatSpeed, shortenPath, trunca
 import {addToHistory, loadHistory} from './lib/history.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
 import {revealInFileManager} from './lib/reveal.js'
-import {downloadItems, folderName, itemTemplate, type PlaylistInfo} from './lib/playlist.js'
+import type {PlaylistInfo} from './lib/playlist.js'
 import {copyFileToClipboard} from './lib/clipboard.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
 import {nextThemeMode, ThemeProvider, type ThemeMode, useTheme} from './theme.js'
 import {
   buildChoices,
   download,
+  downloadPlaylist,
   ensureYtDlp,
   findFfmpeg,
   playlistChoices,
@@ -424,33 +424,22 @@ function AppContent({
           setPhase(prev => (prev.name === 'downloading' ? {...prev, progress, processing: false} : prev)),
         onProcessing: () =>
           setPhase(prev => (prev.name === 'downloading' ? {...prev, processing: true} : prev)),
+        onRefresh: () =>
+          setPhase(prev => (prev.name === 'downloading' ? {...prev, progress: undefined, refreshing: true} : prev)),
       }
       try {
         const ffmpeg = await findFfmpeg()
+        const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current, extra: ytdlpArgs}
         if (playlist) {
           const entries = playlist.entries.filter(entry => ticked.has(entry.index))
           // --name names the folder; the files are named after their items
-          const folder = path.join(outDir, folderName(nameRef.current ?? playlist.title))
-          const results = await downloadItems(
-            entries,
-            entry =>
-              download(
-                {
-                  ytdlp: ytdlpRef.current,
-                  ffmpeg,
-                  url,
-                  choice,
-                  outDir: folder,
-                  auth: authRef.current,
-                  extra: ytdlpArgs,
-                  playlistItem: entry.index,
-                  template: itemTemplate(entry, playlist.entries.length),
-                },
-                handlers,
-                controller.signal,
-              ),
-            (position, entry) =>
-              setPhase({name: 'downloading', choice, processing: false, item: {position, count: entries.length, title: entry.title}}),
+          const {folder, results} = await downloadPlaylist(
+            {...base, playlist, entries},
+            {
+              ...handlers,
+              onItem: (position, entry) =>
+                setPhase({name: 'downloading', choice, processing: false, item: {position, count: entries.length, title: entry.title}}),
+            },
             controller.signal,
           )
           const saved = results.flatMap(result => (result.filepath ? [result.filepath] : []))
@@ -462,19 +451,8 @@ function AppContent({
           setPhase({name: 'done', filepath: saved[0]!, playlist: {folder, saved: saved.length, failed}})
           return
         }
-        const base = {ytdlp: ytdlpRef.current, ffmpeg, url, choice, outDir, auth: authRef.current, name: nameRef.current, extra: ytdlpArgs}
-        let filepath: string
-        try {
-          // reuse the probe's metadata — starts immediately instead of re-extracting
-          filepath = await download({...base, infoJsonPath: infoJsonRef.current}, handlers, controller.signal)
-        } catch (error) {
-          if (controller.signal.aborted) throw error
-          // media urls in the cached info can expire — retry with a fresh extraction
-          setPhase(prev =>
-            prev.name === 'downloading' ? {...prev, progress: undefined, refreshing: true} : prev,
-          )
-          filepath = await download(base, handlers, controller.signal)
-        }
+        // reuse the probe's metadata — starts immediately instead of re-extracting
+        const filepath = await download({...base, infoJsonPath: infoJsonRef.current}, handlers, controller.signal)
         nameRef.current = undefined
         onOutcome({filepath})
         setHistory(addToHistory(url))
