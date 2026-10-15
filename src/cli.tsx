@@ -11,7 +11,7 @@ import {isProbablyUrl} from './lib/platforms.js'
 import {ensureOutputDir, resolveOutputDir, resolveUserPath} from './lib/output-dir.js'
 import type {Cookies} from './lib/cookies.js'
 import {CONFIG_FILE, loadConfig, type Config} from './lib/config.js'
-import {MANAGED_DIR, assetName, installLatest, managedPath, markChecked} from './lib/ytdlp-install.js'
+import {assetName, installLatest, managedPath} from './lib/ytdlp-install.js'
 import {runHeadless} from './headless.js'
 
 // read at runtime from the shipped package.json so npm version bumps
@@ -88,7 +88,6 @@ if (args.update) {
   }
   try {
     const {status, tag} = await installLatest({target: managedPath(), asset, onStatus: message => console.log(message)})
-    await markChecked(MANAGED_DIR)
     console.log(status === 'up-to-date' ? `yt-dlp ${tag} is already the latest.` : `✓ yt-dlp ${tag} ${status}.`)
     if (process.env.YOINKS_YT_DLP) console.log(`note: YOINKS_YT_DLP is set, so yoinks runs “${process.env.YOINKS_YT_DLP}” instead.`)
     process.exit(0)

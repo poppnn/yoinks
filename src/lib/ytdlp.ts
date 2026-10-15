@@ -46,19 +46,23 @@ export async function ensureYtDlp(onStatus: (message: string) => void, signal?: 
       () => true,
       () => false,
     )
-    if (!have || (await dueForCheck())) {
-      if (have) onStatus('checking for a yt-dlp update…')
-      try {
-        await installLatest({target: managed, asset, signal, onStatus})
-      } catch (error) {
-        signal?.throwIfAborted()
-        installError = error // an update that fails keeps the copy we have
-      }
-      // count it even if GitHub was unreachable: a network that blocks it
-      // would otherwise stall every launch. `yoinks --update` forces a retry.
-      await markChecked().catch(() => {})
+    // checked less than a day ago, and it ran then: skip running it again,
+    // which takes ~1.3 s on Windows
+    if (have && !(await dueForCheck())) return managed
+    if (have) onStatus('checking for a yt-dlp update…')
+    try {
+      await installLatest({target: managed, asset, signal, onStatus})
+    } catch (error) {
+      signal?.throwIfAborted()
+      installError = error // an update that fails keeps the copy we have
     }
-    if (await commandWorks(managed, ['--version'], signal)) return managed
+    if (await commandWorks(managed, ['--version'], signal)) {
+      // counted even if GitHub was unreachable, or a network that blocks it
+      // would stall every launch; but only once it runs, so a build that
+      // can't (e.g. on musl Linux) keeps falling back to the system yt-dlp
+      await markChecked().catch(() => {})
+      return managed
+    }
   }
 
   if (await commandWorks('yt-dlp', ['--version'], signal)) return 'yt-dlp'
