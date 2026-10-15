@@ -46,6 +46,9 @@ test('--items takes numbers and ranges, in playlist order', () => {
   assert.throws(() => selectItems('two', entries), /“two” isn't a number or a range/)
   assert.throws(() => selectItems('5-2', entries), /not a valid range/)
   assert.throws(() => selectItems('20-30', entries), /nothing in “20-30” — the playlist has 12 items/)
+  // entry 1 was a sub-playlist and left out: "1" picks nothing, "2" picks the one numbered 2
+  const gapped = entries.slice(1)
+  assert.deepEqual(selectItems('1-2', gapped).map(e => e.index), [2])
 })
 
 test('folder names every OS accepts', () => {
