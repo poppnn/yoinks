@@ -2,7 +2,7 @@
 
 [English](ROADMAP.md) · **Français**
 
-> Diagnostic du 9 octobre 2026 sur `pablostanley/yoinks@6f03720` (v0.3.1). Mis à jour le 12 octobre 2026 : **les phases 0 à 5 sont faites**, et la v0.4.0 est prête à publier sur npm sous le nom `yoinks-cli`.
+> Diagnostic du 9 octobre 2026 sur `pablostanley/yoinks@6f03720` (v0.3.1). Mis à jour le 12 octobre 2026 : **les phases 0 à 5 sont faites**, et la v0.4.0 a été publiée sur npm sous le nom `yoinks-cli` le 12 octobre 2026.
 
 ## 1. État des lieux
 

@@ -6,6 +6,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- A video title could run PowerShell commands when you pressed `c` to copy
+  the file on Windows: PowerShell also ends a quoted string at `’`. The path
+  no longer goes into the command at all.
+
+### Fixed
+
+- **Titles with accents or non-Latin characters failed on Windows, and the
+  file was deleted.** yt-dlp printed the saved path in the console's code
+  page, so yoinks couldn't find the file to move it out of its staging
+  folder.
+- A failed download is no longer downloaded again in full: only expired
+  links are retried.
+- `--items` picks by the numbers the picker shows, also when a playlist
+  lists sub-playlists.
+- Two downloads of the same title at once can no longer overwrite each
+  other, and two yoinks updating yt-dlp at once no longer break the update.
+- The link in your clipboard is offered again on slow Windows starts; it
+  used to be dropped past half a second.
+
+### Changed
+
+- Playlists download each item by its own url when there is one: items
+  far down a long playlist no longer wait longer and longer to start.
+- yoinks starts faster: it no longer runs `yt-dlp --version` on every
+  launch (about 1.3 s on Windows), nor waits for the clipboard.
+
 ## [0.4.0] - 2026-10-12
 
 First release as **`yoinks-cli`**, the maintained fork of

@@ -2,7 +2,7 @@
 
 **English** · [Français](ROADMAP.fr.md)
 
-> Diagnosis of 9 October 2026, on `pablostanley/yoinks@6f03720` (v0.3.1). Updated 12 October 2026: **phases 0 to 5 are done**, and v0.4.0 is ready to publish on npm as `yoinks-cli`.
+> Diagnosis of 9 October 2026, on `pablostanley/yoinks@6f03720` (v0.3.1). Updated 12 October 2026: **phases 0 to 5 are done**, and v0.4.0 was published on npm as `yoinks-cli` on 12 October 2026.
 
 ## 1. Where things stood
 
