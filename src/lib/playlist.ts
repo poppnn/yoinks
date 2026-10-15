@@ -33,17 +33,18 @@ export function parsePlaylist(json: unknown): PlaylistInfo | undefined {
  * picker) into the matching entries, in playlist order.
  */
 export function selectItems(spec: string, entries: PlaylistEntry[]): PlaylistEntry[] {
-  const wanted = new Set<number>()
-  const count = entries.length
-  for (const part of spec.split(',').map(p => p.trim())) {
+  const ranges = spec.split(',').map(raw => {
+    const part = raw.trim()
     const match = /^(\d+)(?:(-)(\d*))?$/.exec(part)
     if (!match) throw new Error(`--items: “${part}” isn't a number or a range like 2-5`)
     const from = Number(match[1])
-    const to = match[2] ? (match[3] ? Number(match[3]) : count) : from
+    const to = match[2] ? (match[3] ? Number(match[3]) : Infinity) : from
     if (from < 1 || to < from) throw new Error(`--items: “${part}” is not a valid range`)
-    for (let n = from; n <= Math.min(to, count); n++) wanted.add(n)
-  }
-  const picked = entries.filter((_, i) => wanted.has(i + 1))
+    return [from, to] as const
+  })
+  // by the numbers the picker shows, which skip entries left out of the list
+  const picked = entries.filter(({index}) => ranges.some(([from, to]) => index >= from && index <= to))
+  const count = entries.length
   if (picked.length === 0) throw new Error(`--items: nothing in “${spec}” — the playlist has ${count} item${count === 1 ? '' : 's'}`)
   return picked
 }
