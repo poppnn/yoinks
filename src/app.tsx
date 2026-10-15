@@ -20,7 +20,7 @@ import {addToHistory, loadHistory} from './lib/history.js'
 import {detectPlatform, isProbablyUrl, type Platform} from './lib/platforms.js'
 import {revealInFileManager} from './lib/reveal.js'
 import type {PlaylistInfo} from './lib/playlist.js'
-import {copyFileToClipboard} from './lib/clipboard.js'
+import {copyFileToClipboard, readClipboardAsync} from './lib/clipboard.js'
 import {useMouseClick} from './lib/use-mouse-click.js'
 import {nextThemeMode, ThemeProvider, type ThemeMode, useTheme} from './theme.js'
 import {
@@ -164,7 +164,6 @@ const HINTS: Record<Phase['name'], Array<[string, string]>> = {
 
 type AppProps = {
   initialUrl?: string
-  clipboardUrl?: string
   initialThemeMode?: ThemeMode
   outDir: string
   cookies?: Cookies
@@ -193,7 +192,6 @@ export function App({initialThemeMode = 'auto', ...props}: AppProps) {
 
 function AppContent({
   initialUrl,
-  clipboardUrl,
   outDir,
   cookies,
   name,
@@ -204,7 +202,6 @@ function AppContent({
   cycleTheme,
 }: {
   initialUrl?: string
-  clipboardUrl?: string
   onOutcome: (outcome: Outcome) => void
   outDir: string
   cookies?: Cookies
@@ -221,6 +218,17 @@ function AppContent({
   const [urlInput, setUrlInput] = useState('')
   const [history, setHistory] = useState(loadHistory)
   const [platform, setPlatform] = useState<Platform>()
+  // a url already in the clipboard, offered with ⇥ — read after the first
+  // frame: a cold PowerShell can take a second, and the launch used to wait
+  const [clipboardUrl, setClipboardUrl] = useState<string>()
+  useEffect(() => {
+    if (initialUrl) return
+    void readClipboardAsync().then(text => {
+      const clipped = text.trim()
+      // reject multi-line content — new URL() silently strips newlines
+      if (clipped && !/\s/.test(clipped) && isProbablyUrl(clipped)) setClipboardUrl(clipped)
+    })
+  }, [initialUrl])
   const [info, setInfo] = useState<VideoInfo>()
   const [choices, setChoices] = useState<DownloadChoice[]>([])
   // a playlist link: its items, which are ticked (by playlist index), and the row under the cursor
