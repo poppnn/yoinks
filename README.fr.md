@@ -45,10 +45,13 @@ automatiquement.
 $ yoinks https://youtu.be/dQw4w9WgXcQ    # directement au choix du format
 $ yoinks                                 # demande un lien
 $ yoinks <lien de playlist>              # cochez les éléments voulus
-$ yoinks -o ~/Vidéos <lien>              # enregistre dans le dossier de votre choix
+$ yoinks -o ~/Videos <lien>              # enregistre dans le dossier de votre choix
 $ yoinks --mp3 <lien>                    # sans interface : pour les scripts
 $ yoinks --help                          # tout le reste
 ```
+
+Sous Windows, le dossier que l'Explorateur affiche « Vidéos » s'appelle en
+réalité `Videos` : `-o ~/Vidéos` créerait un nouveau dossier à côté.
 
 yoinks occupe tout le terminal (plein écran, centré, et rend votre
 historique intact en sortant). Choisissez un format avec ↑/↓ (ou j/k, ou
@@ -140,7 +143,7 @@ Les réglages que vous indiqueriez à chaque fois vont dans
 
 ```json
 {
-  "output": "~/Vidéos",
+  "output": "~/Videos",
   "cookies": "~/cookies.txt",
   "theme": "dark",
   "format": "mp3"

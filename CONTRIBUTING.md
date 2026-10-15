@@ -38,8 +38,8 @@ terminal.
 
 - **One topic per pull request.** Small PRs get reviewed and merged
   quickly; a PR that touches many unrelated things will be asked to split.
-- **One commit per logical change**, with a message that says what it fixes
-  or adds (`fix: …`, `feat: …`, `docs: …`, `ci: …`).
+- **One commit per logical change**, with a message in English that says
+  what it fixes or adds (`fix: …`, `feat: …`, `docs: …`, `ci: …`).
 - Add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
   for anything a user would notice.
 - Explain how you verified the change, especially on platforms you could
