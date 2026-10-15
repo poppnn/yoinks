@@ -204,23 +204,12 @@ export function playlistChoices(): DownloadChoice[] {
   const capped = (height: number): DownloadChoice => ({
     kind: 'video',
     label: `up to ${height}p · mp4`,
-    args: ['-f', cappedSelector(height), '--merge-output-format', 'mp4'],
+    args: ['-f', selector(`[height<=${height}]`, 'bv*+ba'), '--merge-output-format', 'mp4'],
     embed: EMBED_VIDEO,
   })
   return [capped(1080), capped(720), capped(360), audioChoice()]
 }
 
-function cappedSelector(height: number): string {
-  const cap = `[height<=${height}]`
-  return [
-    `bv*${cap}[vcodec~='^(avc|h264)']${WITH_AAC}`,
-    `bv*${cap}[vcodec^=av01]${WITH_AAC}`,
-    `bv*${cap}+ba`,
-    `b${cap}`,
-    'bv*+ba',
-    'b',
-  ].join('/')
-}
 
 function audioChoice(): DownloadChoice {
   return {
@@ -231,13 +220,14 @@ function audioChoice(): DownloadChoice {
   }
 }
 
-function videoSelector(height: number): string {
+/** H.264, then AV1, with AAC, within `height`; then anything within it; then `fallback`. */
+function selector(height: string, fallback: string): string {
   return [
-    `bv*[height=${height}][vcodec~='^(avc|h264)']${WITH_AAC}`,
-    `bv*[height=${height}][vcodec^=av01]${WITH_AAC}`,
-    `bv*[height=${height}]+ba`,
-    `b[height=${height}]`,
-    `bv*[height<=${height}]+ba`,
+    `bv*${height}[vcodec~='^(avc|h264)']${WITH_AAC}`,
+    `bv*${height}[vcodec^=av01]${WITH_AAC}`,
+    `bv*${height}+ba`,
+    `b${height}`,
+    fallback,
     'b',
   ].join('/')
 }
@@ -256,7 +246,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
 
   for (const height of heights.slice(0, MAX_VIDEO_CHOICES)) {
     const candidates = videos.filter(f => f.height === height)
-    // guess the stream videoSelector will get, so the size matches the download
+    // guess the stream the selector will get, so the size matches the download
     const preferred = [isH264, isAv1].map(is => candidates.filter(is)).find(group => group.length > 0) ?? candidates
     const best = [...preferred].sort((a, b) => Number(Boolean(sizeOf(b))) - Number(Boolean(sizeOf(a))) || byBitrate(a, b))[0]!
     const muxed = best.acodec && best.acodec !== 'none'
@@ -270,7 +260,7 @@ export function buildChoices(info: VideoInfo): DownloadChoice[] {
     choices.push({
       kind: 'video',
       label: `${height}p · mp4${codecLabel}${sizeLabel}`,
-      args: ['-f', videoSelector(height), '--merge-output-format', 'mp4'],
+      args: ['-f', selector(`[height=${height}]`, `bv*[height<=${height}]+ba`), '--merge-output-format', 'mp4'],
       embed: EMBED_VIDEO,
     })
   }
