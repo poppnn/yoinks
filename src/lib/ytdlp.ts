@@ -131,9 +131,11 @@ export async function probe(
   const stdout = await new Promise<string>((resolve, reject) => {
     // --no-playlist keeps a video link that also names a playlist (watch?v=…&list=…)
     // a single video; --flat-playlist lists a real playlist without probing every item
-    const child = spawn(ytdlp, ['-J', '--no-playlist', '--flat-playlist', '--no-warnings', ...auth, ...extra, url], {
+    const child = spawn(ytdlp, ['-J', '--no-playlist', '--flat-playlist', '--no-warnings', ...UTF8, ...auth, ...extra, url], {
       signal,
     })
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
@@ -316,6 +318,13 @@ export type DownloadHandlers = {
   onProcessing: () => void
 }
 
+/**
+ * On Windows yt-dlp prints in the console's code page when piped: a title
+ * like "été 日本" came back mangled (or lost), the saved file couldn't be
+ * found, and it was deleted with the staging folder.
+ */
+const UTF8 = ['--encoding', 'utf-8']
+
 const PROGRESS_PREFIX = 'YOINK|'
 const PROGRESS_TEMPLATE = `${PROGRESS_PREFIX}%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s`
 
@@ -387,6 +396,7 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     ...(opts.auth ?? []),
     ...(opts.playlistItem ? ['--yes-playlist', '-I', String(opts.playlistItem)] : ['--no-playlist']),
     '--no-warnings',
+    ...UTF8,
     // HLS/DASH sites (X, Twitch, Vimeo…) serve hundreds of small fragments:
     // fetching four at a time is several times faster
     '--concurrent-fragments',
@@ -420,8 +430,11 @@ function runYtDlp(opts: DownloadOptions, handlers: DownloadHandlers, signal?: Ab
     let lastDownloaded = 0
     let buffer = ''
 
-    child.stdout.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString()
+    // decodes whole characters even when one is split across two chunks
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      buffer += chunk
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
       for (const rawLine of lines) {

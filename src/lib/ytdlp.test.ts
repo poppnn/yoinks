@@ -253,6 +253,8 @@ test('embedding is only asked for when ffmpeg is there', {skip: process.platform
   }
 
   const missing = await ran(undefined)
+  // Windows prints in the console code page otherwise, and non-ASCII titles get lost
+  assert.equal(missing[missing.indexOf('--encoding') + 1], 'utf-8')
   assert.ok(!missing.includes('--embed-metadata'))
   assert.ok(!missing.includes('--ffmpeg-location'))
 
