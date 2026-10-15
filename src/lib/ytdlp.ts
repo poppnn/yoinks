@@ -419,14 +419,22 @@ async function moveToFreeName(file: string, dir: string): Promise<string> {
   const {name, ext} = path.parse(file)
   for (let n = 0; ; n++) {
     const target = path.join(dir, n === 0 ? `${name}${ext}` : `${name} (${n})${ext}`)
-    const taken = await fs.lstat(target).then(
-      () => true,
-      () => false,
-    )
-    if (!taken) {
-      await fs.rename(file, target)
-      return target
+    // claim the name atomically ("wx" fails if it exists), then move over the
+    // empty placeholder: check-then-rename let a parallel download take it
+    // between the two, and rename silently replaced that file
+    try {
+      await (await fs.open(target, 'wx')).close()
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue
+      throw error
     }
+    try {
+      await fs.rename(file, target)
+    } catch (error) {
+      await fs.rm(target, {force: true})
+      throw error
+    }
+    return target
   }
 }
 

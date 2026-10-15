@@ -107,7 +107,8 @@ export async function installLatest(opts: {
 
   opts.onStatus?.(current ? `updating yt-dlp to ${tag}…` : `first run: fetching yt-dlp ${tag}…`)
   await fs.mkdir(path.dirname(opts.target), {recursive: true})
-  const tmp = `${opts.target}.download`
+  // per process: two yoinks updating at once would write the same file
+  const tmp = `${opts.target}.${process.pid}.download`
   try {
     // no timeout here: a 40 MB binary can legitimately take a while, and esc still cancels
     const response = await fetchImpl(`${base}/${opts.asset}`, {signal: opts.signal})
