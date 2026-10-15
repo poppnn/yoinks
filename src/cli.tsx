@@ -6,8 +6,6 @@ import {render} from 'ink'
 import {App, type Display, type Outcome} from './app.js'
 import {captureFrames} from './lib/click-map.js'
 import {parseArgs} from './lib/args.js'
-import {readClipboard} from './lib/clipboard.js'
-import {isProbablyUrl} from './lib/platforms.js'
 import {ensureOutputDir, resolveOutputDir, resolveUserPath} from './lib/output-dir.js'
 import type {Cookies} from './lib/cookies.js'
 import {CONFIG_FILE, loadConfig, type Config} from './lib/config.js'
@@ -155,13 +153,6 @@ const display: Display = {
   motion: !plain && !args.noMotion && config.motion !== false,
 }
 
-// no url given — offer the clipboard url (⇥ to paste) when it already holds one
-let clipboardUrl: string | undefined
-if (!initialUrl && isTTY) {
-  const clipped = readClipboard().trim()
-  // reject multi-line clipboard content — new URL() silently strips newlines
-  if (clipped && !/\s/.test(clipped) && isProbablyUrl(clipped)) clipboardUrl = clipped
-}
 let inAltScreen = false
 const enterAltScreen = () => {
   process.stdout.write('\x1b[?1049h\x1b[H')
@@ -207,7 +198,6 @@ let outcome: Outcome = {}
 const {waitUntilExit} = render(
   <App
     initialUrl={initialUrl}
-    clipboardUrl={clipboardUrl}
     initialThemeMode={initialThemeMode}
     outDir={outDir}
     cookies={cookies}

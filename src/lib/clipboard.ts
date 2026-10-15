@@ -23,6 +23,17 @@ export function readClipboard(): string {
   return ''
 }
 
+/** readClipboard without blocking — for the url offered at launch, where a cold PowerShell can take a second. */
+export async function readClipboardAsync(): Promise<string> {
+  for (const [command, args] of COMMANDS) {
+    const text = await new Promise<string | undefined>(resolve =>
+      execFile(command, args, {encoding: 'utf8', timeout: 2_000, windowsHide: true}, (error, stdout) => resolve(error ? undefined : stdout)),
+    )
+    if (text !== undefined) return text
+  }
+  return ''
+}
+
 /**
  * Put the downloaded file itself on the clipboard — not its path — so it
  * can be pasted into a chat or a file manager. Linux gets a file:// uri,
