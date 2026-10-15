@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises'
-import path from 'node:path'
 import type {Pick} from './lib/args.js'
 import {cookieArgs, type Cookies} from './lib/cookies.js'
 import {formatBytes, formatEta, formatSpeed} from './lib/format.js'
-import {downloadItems, folderName, itemTemplate, selectItems} from './lib/playlist.js'
+import {selectItems} from './lib/playlist.js'
 import {
   buildChoices,
   download,
+  downloadPlaylist,
   ensureYtDlp,
   findFfmpeg,
   playlistChoices,
@@ -65,40 +65,22 @@ export async function runHeadless(opts: {
       const {playlist} = result
       const entries = opts.items ? selectItems(opts.items, playlist.entries) : playlist.entries
       const choice = playlistChoices().find(c => c.kind === (opts.pick === 'mp3' ? 'audio' : 'video'))!
-      // -n names the folder here; a playlist's files are named after their items
-      const folder = path.join(opts.outDir, folderName(opts.name ?? playlist.title))
-      const ffmpeg = await findFfmpeg()
       let current = ''
-      const handlers = {
-        onProgress: (progress: DownloadProgress) => status(`${current} · ${progressLine(choice.label, progress)}`),
-        onProcessing: () => status(`${current} · ${opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'}`),
-      }
-      const results = await downloadItems(
-        entries,
-        async entry => {
-          const filepath = await download(
-            {
-              ytdlp,
-              ffmpeg,
-              url: opts.url,
-              choice,
-              outDir: folder,
-              auth,
-              extra: opts.ytdlpArgs,
-              playlistItem: entry.index,
-              template: itemTemplate(entry, playlist.entries.length),
-            },
-            handlers,
-            controller.signal,
-          )
+      // -n names the folder here; a playlist's files are named after their items
+      const {results} = await downloadPlaylist(
+        {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, name: opts.name, auth, extra: opts.ytdlpArgs, playlist, entries},
+        {
+          onProgress: progress => status(`${current} · ${progressLine(choice.label, progress)}`),
+          onProcessing: () => status(`${current} · ${opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'}`),
+          onItem: (position, entry) => {
+            current = `${position + 1}/${entries.length}`
+            status(`${current} · ${entry.title}`)
+          },
           // as each one lands, so a script can start on it
-          clear()
-          process.stdout.write(`${filepath}\n`)
-          return filepath
-        },
-        (position, entry) => {
-          current = `${position + 1}/${entries.length}`
-          status(`${current} · ${entry.title}`)
+          onSaved: filepath => {
+            clear()
+            process.stdout.write(`${filepath}\n`)
+          },
         },
         controller.signal,
       )
@@ -116,15 +98,11 @@ export async function runHeadless(opts: {
       onProgress: (progress: DownloadProgress) => status(progressLine(choice.label, progress)),
       onProcessing: () => status(opts.pick === 'mp3' ? 'converting to mp3…' : 'merging…'),
     }
-    const base = {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name, extra: opts.ytdlpArgs}
-    let filepath: string
-    try {
-      filepath = await download({...base, infoJsonPath}, handlers, controller.signal)
-    } catch (error) {
-      if (controller.signal.aborted) throw error
-      // media urls in the cached info can expire — retry with a fresh extraction
-      filepath = await download(base, handlers, controller.signal)
-    }
+    const filepath = await download(
+      {ytdlp, ffmpeg: await findFfmpeg(), url: opts.url, choice, outDir: opts.outDir, auth, name: opts.name, extra: opts.ytdlpArgs, infoJsonPath},
+      handlers,
+      controller.signal,
+    )
 
     clear()
     process.stdout.write(`${filepath}\n`)
